@@ -9,7 +9,11 @@ defmodule Pepe.Trace do
 
   The run's own process accumulates events in the process dictionary while it runs (the
   runtime tees every lifecycle event here through `event/1`), then `finish/1` writes the
-  file once. A sub-agent run nested in the same process folds its events into the
+  final row. A row is also written when the run *starts*, with the outcome `"running"`, and
+  refreshed as tool calls happen, so the dashboard shows work in progress instead of only
+  what already finished. A `"running"` row whose run process is gone (a crash, a restart)
+  reads back as `"interrupted"`: the run never reached `finish/1`, so its result was never
+  recorded, which is exactly what someone looking for a missing answer needs to see. A sub-agent run nested in the same process folds its events into the
   outer trace instead of starting a second one, so a trace shows the whole tree of work.
 
   Traces are capped per scope (the oldest are trimmed) so the table stays bounded.
@@ -33,8 +37,16 @@ defmodule Pepe.Trace do
   alias Pepe.Trace.Trace
 
   @key :pepe_trace
+  @flushed :pepe_trace_flushed
   @keep 200
   @clip 4_000
+  # The registry a run's process lives in while it is running, to tell a trace that is
+  # still being written from one whose process died before `finish/1`.
+  @live Pepe.Agent.Registry
+  # How often a running trace's events are rewritten at most (milliseconds).
+  @flush_every 1_000
+  # Events worth a write while running: the ones that change what an operator would see.
+  @flush_on ~w(tool_call tool_result tool_denied failover error)
 
   # --- recording (called from the runtime, inside the run's own process) -------------
 
@@ -64,6 +76,7 @@ defmodule Pepe.Trace do
           events: []
         })
 
+        announce_running()
         :started
 
       _ ->
@@ -123,9 +136,16 @@ defmodule Pepe.Trace do
   """
   def event(ev) do
     case {Process.get(@key), encode_event(ev)} do
-      {nil, _} -> :ok
-      {_, nil} -> :ok
-      {t, e} -> Process.put(@key, %{t | events: [Map.put(e, "ms", System.monotonic_time(:millisecond) - t.t0) | t.events]})
+      {nil, _} ->
+        :ok
+
+      {_, nil} ->
+        :ok
+
+      {t, e} ->
+        t = %{t | events: [Map.put(e, "ms", System.monotonic_time(:millisecond) - t.t0) | t.events]}
+        Process.put(@key, t)
+        if e["t"] in @flush_on, do: flush_running(t, e["t"] == "error")
     end
 
     :ok
@@ -139,6 +159,8 @@ defmodule Pepe.Trace do
 
       t ->
         Process.delete(@key)
+        Process.delete(@flushed)
+        if Process.whereis(@live), do: Registry.unregister(@live, {:trace, t.id})
 
         row = %{
           id: t.id,
@@ -308,6 +330,8 @@ defmodule Pepe.Trace do
   # --- internals ---------------------------------------------------------------------
 
   defp to_map(%Trace{} = e) do
+    e = settle(e)
+
     %{
       "id" => e.id,
       "at" => e.at,
@@ -340,11 +364,79 @@ defmodule Pepe.Trace do
 
   defp usage_list(_), do: []
 
+  # An upsert: the run's `"running"` row, written at `start/5`, is replaced by the final one.
   defp write(row) do
-    Repo.insert_all(Trace, [row])
+    Repo.insert_all(Trace, [row], on_conflict: :replace_all, conflict_target: :id)
     trim(row.scope)
     :ok
   end
+
+  # --- a run in progress ----------------------------------------------------------------
+
+  defp announce_running do
+    t = Process.get(@key)
+
+    if Process.whereis(Repo) do
+      if Process.whereis(@live), do: Registry.register(@live, {:trace, t.id}, nil)
+
+      Repo.insert_all(Trace, [
+        %{
+          id: t.id,
+          scope: scope_name(t.scope),
+          at: t.at,
+          agent: t.agent,
+          session: t.session,
+          source: t.source,
+          prompt: t.prompt,
+          ms: 0,
+          outcome: %{"kind" => "running"},
+          events: []
+        }
+      ])
+    end
+
+    :ok
+  rescue
+    # Never let the record of a run get in the way of the run.
+    e ->
+      Logger.warning("[trace] could not record the start of a run: #{Exception.message(e)}")
+      :ok
+  end
+
+  # Rewrite the running row's events, at most once a second unless `force?` (an error is
+  # always worth showing at once). A write per event would be a quadratic amount of JSON for
+  # a long run.
+  defp flush_running(t, force?) do
+    now = System.monotonic_time(:millisecond)
+    last = Process.get(@flushed)
+
+    if Process.whereis(Repo) != nil and (force? or is_nil(last) or now - last >= @flush_every) do
+      Process.put(@flushed, now)
+
+      from(x in Trace, where: x.id == ^t.id and fragment("json_extract(?, '$.kind') = 'running'", x.outcome))
+      |> Repo.update_all(set: [events: Enum.reverse(t.events), ms: now - t.t0])
+    end
+
+    :ok
+  rescue
+    e ->
+      Logger.debug("[trace] could not refresh a running trace: #{Exception.message(e)}")
+      :ok
+  end
+
+  # A `"running"` row is live only while its run's process is still registered; one that is
+  # not is `"interrupted"` (the run died before it could record how it ended).
+  defp settle(%Trace{outcome: %{"kind" => "running"}} = e) do
+    if live?(e.id) do
+      %{e | ms: max(System.os_time(:second) - e.at, 0) * 1_000}
+    else
+      %{e | outcome: %{"kind" => "interrupted"}}
+    end
+  end
+
+  defp settle(%Trace{} = e), do: e
+
+  defp live?(id), do: Process.whereis(@live) != nil and Registry.lookup(@live, {:trace, id}) != []
 
   # SQLite's `DELETE ... LIMIT` isn't guaranteed compiled into exqlite's bundled build,
   # so this is two statements: how many is this scope over, then delete exactly those

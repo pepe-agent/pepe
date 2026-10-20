@@ -26,6 +26,10 @@ used. Click **Replay** on any run to walk it step by step: the prompt at the top
 then a timeline of every tool call, result, failover, token count, and the final
 answer.
 
+## Runs in progress
+
+A run shows up in the list the moment it **starts**, marked **in progress**, and its steps appear as the agent works. When it ends, the same row becomes `ok` or an error. If the run stopped before it could record how it ended (the server restarted, or the process crashed), it shows as **interrupted**, so a missing answer is never a silent gap. While something is running, the page refreshes by itself every few seconds; the **Outcome** filter has *In progress* and *Interrupted* options.
+
 ## From the CLI
 
 ```bash

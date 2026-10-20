@@ -28,6 +28,10 @@ Clicar em **Replay** numa execução abre uma linha do tempo passo a passo: o
 prompt no topo, depois cada chamada de ferramenta, resultado, failover,
 contagem de tokens, até chegar na resposta final.
 
+## Execuções em andamento
+
+Uma execução aparece na lista assim que **começa**, marcada como **em andamento**, e os passos dela vão aparecendo enquanto o agente trabalha. Quando termina, a mesma linha vira `ok` ou um erro. Se a execução parou antes de registrar como terminou (o servidor reiniciou, ou o processo caiu), ela aparece como **interrompida**, então uma resposta que não chegou nunca fica sem explicação. Enquanto algo está rodando, a página se atualiza sozinha a cada poucos segundos, e o filtro **Resultado** tem as opções *Em andamento* e *Interrompido*.
+
 ## Pela CLI
 
 ```bash

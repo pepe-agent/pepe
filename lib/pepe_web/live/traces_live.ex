@@ -22,8 +22,13 @@ defmodule PepeWeb.TracesLive do
   @per_page 25
   @cap 1000
 
+  # How often a page with a run in progress looks again (milliseconds).
+  @refresh_ms 3_000
+
   @impl true
   def mount(params, _session, socket) do
+    if connected?(socket), do: Process.send_after(self(), :refresh, @refresh_ms)
+
     {:ok,
      socket
      |> assign(
@@ -319,6 +324,8 @@ defmodule PepeWeb.TracesLive do
           <option value="" selected={@f_outcome == ""}>{gettext("Any outcome")}</option>
           <option value="ok" selected={@f_outcome == "ok"}>{gettext("Ok")}</option>
           <option value="error" selected={@f_outcome == "error"}>{gettext("Error")}</option>
+          <option value="running" selected={@f_outcome == "running"}>{gettext("In progress")}</option>
+          <option value="interrupted" selected={@f_outcome == "interrupted"}>{gettext("Interrupted")}</option>
         </select>
       </div>
       <div>
@@ -663,10 +670,53 @@ defmodule PepeWeb.TracesLive do
     """
   end
 
+  defp outcome_badge(%{outcome: %{"kind" => "running"}} = assigns) do
+    ~H"""
+    <span class="inline-flex items-center gap-1.5 rounded-full bg-amber-500/15 px-2.5 py-1 text-xs font-medium text-amber-400">
+      <span class="size-1.5 animate-pulse rounded-full bg-amber-400"></span>{gettext("in progress")}
+    </span>
+    """
+  end
+
+  defp outcome_badge(%{outcome: %{"kind" => "interrupted"}} = assigns) do
+    ~H"""
+    <span
+      class="rounded-full bg-red-500/15 px-2.5 py-1 text-xs font-medium text-red-400"
+      title={gettext("The run stopped before it finished, so its result was never recorded.")}
+    >
+      {gettext("interrupted")}
+    </span>
+    """
+  end
+
   defp outcome_badge(assigns) do
     ~H"""
     <span class="rounded-full bg-zinc-700/40 px-2.5 py-1 text-xs text-zinc-400">–</span>
     """
+  end
+
+  # While any run is in progress, look again so it moves from "in progress" to its result
+  # without a reload; with nothing running this is one cheap check.
+  @impl true
+  def handle_info(:refresh, socket) do
+    Process.send_after(self(), :refresh, @refresh_ms)
+    {:noreply, if(running?(socket), do: refresh_running(socket), else: socket)}
+  end
+
+  defp running?(%{assigns: a}) do
+    Enum.any?(a.all_traces, &running_trace?/1) or running_trace?(a.selected)
+  end
+
+  defp running_trace?(%{"outcome" => %{"kind" => "running"}}), do: true
+  defp running_trace?(_), do: false
+
+  defp refresh_running(socket) do
+    socket = load_list(socket)
+
+    case socket.assigns do
+      %{selected: %{"id" => id}, selected_scope: scope} -> assign(socket, selected: Trace.get(scope, id))
+      _ -> socket
+    end
   end
 
   @impl true

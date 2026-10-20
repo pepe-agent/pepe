@@ -1430,7 +1430,14 @@ defmodule Mix.Tasks.Pepe do
 
   defp print_trace_line(t) do
     kind = get_in(t, ["outcome", "kind"]) || "?"
-    mark = if kind == "error", do: red("✗"), else: green("✓")
+
+    mark =
+      case kind do
+        "error" -> red("✗")
+        "interrupted" -> red("!")
+        "running" -> yellow("…")
+        _ -> green("✓")
+      end
 
     puts(
       "  #{mark} #{dim(t["id"])}  #{String.pad_trailing(t["agent"], 20)} " <>

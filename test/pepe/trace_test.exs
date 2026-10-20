@@ -19,6 +19,66 @@ defmodule Pepe.TraceTest do
     :ok
   end
 
+  describe "a run in progress" do
+    test "shows up as running with its first events before it finishes" do
+      assert Trace.start("acme/bot", "api:123", "check the logs") == :started
+      scope = Pepe.Project.of("acme/bot") |> then(&(&1 || Pepe.Config.default_project_slug()))
+
+      assert [%{"outcome" => %{"kind" => "running"}, "prompt" => "check the logs"}] = Trace.recent(scope)
+
+      Trace.event({:tool_call, "read_file", ~s({"path":"a.txt"})})
+      [%{"id" => id}] = Trace.recent(scope)
+      assert %{"outcome" => %{"kind" => "running"}, "events" => [%{"t" => "tool_call"}]} = Trace.get(scope, id)
+    end
+
+    test "finish replaces the running row instead of adding a second one" do
+      Trace.start("acme/bot", "api:123", "hi")
+      scope = Pepe.Project.of("acme/bot") |> then(&(&1 || Pepe.Config.default_project_slug()))
+      [%{"id" => running_id}] = Trace.recent(scope)
+
+      assert Trace.finish({:ok, "done", []}) == running_id
+      assert [%{"id" => ^running_id, "outcome" => %{"kind" => "ok"}}] = Trace.recent(scope)
+    end
+
+    test "a run whose process died before finishing reads back as interrupted" do
+      parent = self()
+
+      pid =
+        spawn(fn ->
+          Trace.start("acme/bot", "api:9", "never finishes")
+          send(parent, {:started, Trace.current().id})
+          Process.sleep(:infinity)
+        end)
+
+      assert_receive {:started, id}
+      scope = Pepe.Project.of("acme/bot") |> then(&(&1 || Pepe.Config.default_project_slug()))
+      assert %{"outcome" => %{"kind" => "running"}} = Trace.get(scope, id)
+
+      ref = Process.monitor(pid)
+      Process.exit(pid, :kill)
+      assert_receive {:DOWN, ^ref, :process, ^pid, _}
+
+      assert %{"outcome" => %{"kind" => "interrupted"}} = eventually(fn -> Trace.get(scope, id) end, "interrupted")
+    end
+  end
+
+  # The registry drops a dead process's entry asynchronously, so poll briefly.
+  defp eventually(fun, kind, tries \\ 40) do
+    result = fun.()
+
+    cond do
+      get_in(result, ["outcome", "kind"]) == kind ->
+        result
+
+      tries == 0 ->
+        result
+
+      true ->
+        Process.sleep(25)
+        eventually(fun, kind, tries - 1)
+    end
+  end
+
   test "start/event/finish record a run and it reads back with its events" do
     assert Trace.start("acme/bot", "api:123") == :started
     Trace.event({:tool_call, "read_file", ~s({"path":"a.txt"})})

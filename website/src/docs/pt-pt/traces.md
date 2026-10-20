@@ -18,6 +18,10 @@ Quando um agente chama outro através de `send_to_agent`, essas execuções anin
 
 Abre **Traces** na barra lateral e vês as execuções mais recentes do âmbito de workspace atual, com o desfecho, a duração e as ferramentas usadas em cada uma. Ao clicar em **Replay** numa execução, percorres-la passo a passo: o prompt no topo, seguido de uma linha temporal com cada chamada de ferramenta, resultado, failover, contagem de tokens e a resposta final.
 
+## Execuções em curso
+
+Uma execução aparece na lista logo que **começa**, marcada como **em curso**, e os passos dela vão surgindo enquanto o agente trabalha. Quando termina, a mesma linha passa a `ok` ou a um erro. Se a execução parou antes de registar como terminou (o servidor reiniciou, ou o processo falhou), aparece como **interrompida**, e assim uma resposta que não chegou nunca fica sem explicação. Enquanto algo está a correr, a página atualiza-se sozinha a cada poucos segundos, e o filtro **Resultado** tem as opções *Em curso* e *Interrompido*.
+
 ## Pela CLI
 
 ```bash

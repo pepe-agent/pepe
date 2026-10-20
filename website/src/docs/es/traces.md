@@ -18,6 +18,10 @@ Cuando un agente llama a otro con `send_to_agent`, la ejecución del subagente s
 
 Abre **Traces** en la barra lateral. Ahí aparecen las ejecuciones más recientes del proyecto actual, con su resultado, su duración y qué herramientas usó cada una. Haz clic en **Replay** sobre cualquier ejecución para recorrerla paso a paso: arriba el prompt, y debajo una línea de tiempo con cada llamada a herramienta, su resultado, cada failover, el conteo de tokens y la respuesta final.
 
+## Ejecuciones en curso
+
+Una ejecución aparece en la lista en cuanto **empieza**, marcada como **en curso**, y sus pasos van apareciendo mientras el agente trabaja. Cuando termina, la misma fila pasa a `ok` o a un error. Si la ejecución se detuvo antes de registrar cómo terminó (el servidor se reinició o el proceso falló), aparece como **interrumpida**, así que una respuesta que no llegó nunca queda sin explicación. Mientras algo se está ejecutando, la página se actualiza sola cada pocos segundos, y el filtro **Resultado** tiene las opciones *En curso* e *Interrumpido*.
+
 ## Desde la CLI
 
 ```bash
