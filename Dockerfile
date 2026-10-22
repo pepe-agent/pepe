@@ -140,6 +140,7 @@ FROM ${RUNNER_IMAGE} AS runtime
 RUN apt-get update -y \
   && apt-get install -y --no-install-recommends \
        libstdc++6 openssl libncurses6 libgomp1 locales ca-certificates curl git \
+  && apt-get install -y --no-install-recommends --only-upgrade ca-certificates \
   && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Refuse to build on a trust store that still carries emSign ECC Root CA - G3, the root whose

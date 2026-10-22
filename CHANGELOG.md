@@ -5,11 +5,11 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
-## [0.21.1] - 2026-10-22
+## [0.21.2] - 2026-10-22
 
 ### Security
 
-- **The Docker image no longer trusts the root behind the eMudhra CA key compromise (RHSB-2026-012).** Pepe checks other servers' certificates against the system trust store, and a store from before the fix would let anyone able to intercept the network between Pepe and a provider (a model API, Telegram, a page fetched by `fetch_url`) impersonate that server. The image build now fails if the store still carries it. Rebuild and redeploy to pick it up; running from source, update your operating system's `ca-certificates` instead.
+- **The Docker image no longer trusts the root behind the eMudhra CA key compromise (RHSB-2026-012).** Pepe checks other servers' certificates against the system trust store, and a store from before the fix would let anyone able to intercept the network between Pepe and a provider (a model API, Telegram, a page fetched by `fetch_url`) impersonate that server. The image build now fails if the store still carries it. Rebuild and redeploy to pick it up (0.21.2 also forces the update, so a cached build layer cannot keep the old store); running from source, update your operating system's `ca-certificates` instead.
 
 ### Added
 
