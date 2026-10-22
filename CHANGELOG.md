@@ -5,6 +5,12 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+## [0.21.1] - 2026-10-22
+
+### Security
+
+- **The Docker image no longer trusts the root behind the eMudhra CA key compromise (RHSB-2026-012).** Pepe checks other servers' certificates against the system trust store, and a store from before the fix would let anyone able to intercept the network between Pepe and a provider (a model API, Telegram, a page fetched by `fetch_url`) impersonate that server. The image build now fails if the store still carries it. Rebuild and redeploy to pick it up; running from source, update your operating system's `ca-certificates` instead.
+
 ### Added
 
 - **Who can approve risky actions is now its own list on a chat connection, separate from who can train.** Teaching the agent and approving a command are different powers, but approving used to follow the trainers list. Set it in the connection form on the Channels page, with `mix pepe gateway approvers SLUG --set none|*|id1,id2|default` or `--approvers` on `gateway whatsapp add` and `gateway discord add`. It accepts `*` for everyone in the conversation, said on purpose. A connection with no approvers of its own keeps using its trainers, so nothing changes until you set it; an explicit empty list turns typed approval off even where trainers are set.

@@ -142,6 +142,14 @@ RUN apt-get update -y \
        libstdc++6 openssl libncurses6 libgomp1 locales ca-certificates curl git \
   && apt-get clean && rm -rf /var/lib/apt/lists/*
 
+# Refuse to build on a trust store that still carries emSign ECC Root CA - G3, the root whose
+# cross-signature carries the eMudhra CA key compromise (RHSB-2026-012): Mint/Req verify against this store, so a
+# stale one lets anyone in the network path impersonate any host. Debian fixed it in
+# ca-certificates 20250419+deb13u1.
+RUN if ls /etc/ssl/certs | grep -qiE 'emSign_ECC_Root_CA_-_G3'; then \
+      echo "ca-certificates still trusts the compromised emSign root; use a newer base image" >&2; exit 1; \
+    fi
+
 # Runtime shared libraries the browser Pepe.Browser.Fetcher downloads needs to
 # LAUNCH - not Chromium itself, which stays out of the default image (see
 # PEPE_IMAGE_APT_PACKAGES below). `browser` isn't optional-extra like ffmpeg: it's
