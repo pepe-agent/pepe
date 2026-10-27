@@ -256,7 +256,9 @@ defmodule Pepe.Commitments.SchedulerTest do
     id = put(state: "scheduled", origin_type: "user_reminder", text: "held for later", origin: origin)
 
     tick()
-    wait_until(fn -> match?(%{state: "delivered"}, Config.get_commitment(id)) end)
-    assert Config.get_commitment(id).pending_delivery == "held for later"
+    # "delivered" is persisted before the delivery is attempted, and the held text is written
+    # after it fails, so wait for the held text itself rather than for the state.
+    wait_until(fn -> Config.get_commitment(id).pending_delivery == "held for later" end)
+    assert Config.get_commitment(id).state == "delivered"
   end
 end

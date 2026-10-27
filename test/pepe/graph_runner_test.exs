@@ -337,7 +337,9 @@ defmodule Pepe.Graph.RunnerTest do
         |> Task.await_many(60_000)
 
       assert Enum.count(results, &match?({:ok, %{"status" => "done"}}, &1)) == 1
-      assert Enum.count(results, &match?({:error, {:already, "running"}}, &1)) == 7
+      # A resolver that arrives after the winner has already finished sees "done", not
+      # "running"; both mean it lost, and only the winner may have resumed the run.
+      assert Enum.count(results, &match?({:error, {:already, status}} when status in ["running", "done"], &1)) == 7
 
       final = Graph.get_run(run["id"])
       assert final["status"] == "done"

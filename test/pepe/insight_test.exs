@@ -481,8 +481,10 @@ defmodule Pepe.InsightTest do
 
   describe "clustering lifecycle (no target_column)" do
     defp grouped_rows do
-      group_a = for i <- 1..15, do: %{"age" => 20 + :rand.uniform(3), "spend" => 10 + :rand.uniform(3), "id" => i}
-      group_b = for i <- 1..15, do: %{"age" => 60 + :rand.uniform(3), "spend" => 90 + :rand.uniform(3), "id" => i}
+      # Fixed spread, not random: a random draw can pack a group so tightly that a point
+      # inside it still sits past the anomaly threshold, which made the predict test flaky.
+      group_a = for i <- 1..15, do: %{"age" => 20 + rem(i, 3) + 1, "spend" => 10 + rem(i, 4) + 1, "id" => i}
+      group_b = for i <- 1..15, do: %{"age" => 60 + rem(i, 3) + 1, "spend" => 90 + rem(i, 4) + 1, "id" => i}
       group_a ++ group_b
     end
 
