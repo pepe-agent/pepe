@@ -19,6 +19,21 @@ defmodule Pepe.TraceTest do
     :ok
   end
 
+  describe "run details" do
+    test "a run event records the model setup and survives clipping accented text" do
+      Trace.start("bot", nil, "oi")
+      Trace.event({:run, %{"model" => "openai", "host" => "api.openai.com", "tools" => 3}})
+      # Longer than the clip limit, with a multi-byte character straddling the cut.
+      Trace.event({:tool_result, "bash", String.duplicate("a", 3_999) <> String.duplicate("ã", 10)})
+      id = Trace.finish({:ok, "ok", []})
+      scope = Pepe.Config.default_project_slug()
+
+      assert %{"events" => [run, result]} = Trace.get(scope, id)
+      assert %{"t" => "run", "model" => "openai", "host" => "api.openai.com", "tools" => 3} = run
+      assert String.valid?(result["out"])
+    end
+  end
+
   describe "a run in progress" do
     test "shows up as running with its first events before it finishes" do
       assert Trace.start("acme/bot", "api:123", "check the logs") == :started

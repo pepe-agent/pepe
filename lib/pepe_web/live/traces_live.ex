@@ -493,7 +493,16 @@ defmodule PepeWeb.TracesLive do
 
   defp detail(assigns) do
     {tin, tout} = run_tokens(assigns.trace)
-    assigns = assign(assigns, tokens_in: tin, tokens_out: tout, cost: run_cost(assigns.trace, assigns.models, assigns.cache))
+    events = assigns.trace["events"] || []
+
+    assigns =
+      assign(assigns,
+        tokens_in: tin,
+        tokens_out: tout,
+        cost: run_cost(assigns.trace, assigns.models, assigns.cache),
+        run: Enum.find(events, &(&1["t"] == "run")),
+        events: Enum.reject(events, &(&1["t"] == "run"))
+      )
 
     ~H"""
     <div class="max-w-3xl space-y-5">
@@ -509,6 +518,17 @@ defmodule PepeWeb.TracesLive do
           <.outcome_badge outcome={@trace["outcome"]} />
         </div>
 
+        <.meta_list class="mt-4">
+          <:item label={gettext("Agent")}>{@trace["agent"]}</:item>
+          <:item label={gettext("Channel")}>{source_label(trace_source(@trace))}</:item>
+          <:item :if={chat_line(@trace)} label={gettext("Chat")}>{chat_line(@trace)}</:item>
+          <:item :if={@run && @run["sender"]} label={gettext("Person")}>{@run["sender"]}</:item>
+          <:item :if={@trace["session"]} label={gettext("Conversation")} mono>{@trace["session"]}</:item>
+          <:item :if={@run && @run["model"]} label={gettext("Model")} mono>{model_line(@run)}</:item>
+          <:item :if={@run && @run["host"]} label={gettext("Provider")} mono>{@run["host"]}</:item>
+          <:item :if={@run && (@run["fallbacks"] || []) != []} label={gettext("Fallbacks")} mono>{Enum.join(@run["fallbacks"], ", ")}</:item>
+          <:item :if={@run && is_integer(@run["tools"])} label={gettext("Tools")} mono>{@run["tools"]}</:item>
+        </.meta_list>
         <.meta_list :if={@tokens_in + @tokens_out > 0} class="mt-4">
           <:item label={gettext("Input")} mono>{@tokens_in} {gettext("tokens")}</:item>
           <:item label={gettext("Output")} mono>{@tokens_out} {gettext("tokens")}</:item>
@@ -524,13 +544,13 @@ defmodule PepeWeb.TracesLive do
       </div>
 
       <ol class="relative space-y-3 border-l border-zinc-800 pl-5">
-        <li :for={ev <- @trace["events"]} class="relative">
+        <li :for={ev <- @events} class="relative">
           <span class="absolute -left-[26px] top-1 flex h-5 w-5 items-center justify-center rounded-full bg-zinc-900 text-xs ring-1 ring-zinc-700">
             <.icon name={event_icon(ev)} class="size-3 text-zinc-400" />
           </span>
           <.event ev={ev} />
         </li>
-        <li :if={@trace["events"] == []} class="text-sm text-zinc-500">{gettext("This task ended before doing anything.")}</li>
+        <li :if={@events == []} class="text-sm text-zinc-500">{gettext("This task ended before doing anything.")}</li>
       </ol>
     </div>
     """
@@ -809,6 +829,27 @@ defmodule PepeWeb.TracesLive do
   def handle_event("project_add", params, socket), do: {:noreply, add_project(socket, params)}
 
   # --- formatting helpers ------------------------------------------------------------
+
+  # Where inside the channel it happened: a Telegram key reads as "bot: chat" by the names the
+  # operator gave them (a topic suffix is dropped for the lookup, then put back). `nil` when
+  # the key says nothing a person would read any better than the raw conversation row.
+  defp chat_line(%{"session" => "telegram:" <> _ = key}) do
+    {base, topic} =
+      case String.split(key, "#", parts: 2) do
+        [base, topic] -> {base, " (#" <> topic <> ")"}
+        [base] -> {base, ""}
+      end
+
+    case Pepe.Labels.session(base) do
+      ^base -> nil
+      text -> text <> topic
+    end
+  end
+
+  defp chat_line(_trace), do: nil
+
+  defp model_line(%{"model" => name, "model_id" => id}) when is_binary(id) and id != name, do: "#{name} (#{id})"
+  defp model_line(%{"model" => name}), do: name
 
   defp source_label("cron"), do: gettext("Schedule")
   defp source_label("eval"), do: gettext("Eval")

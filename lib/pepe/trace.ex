@@ -39,6 +39,8 @@ defmodule Pepe.Trace do
   @key :pepe_trace
   @flushed :pepe_trace_flushed
   @keep 200
+  # Traces read per query while searching (see `search/4`).
+  @search_batch 20
   @clip 4_000
   # The registry a run's process lives in while it is running, to tell a trace that is
   # still being written from one whose process died before `finish/1`.
@@ -135,7 +137,7 @@ defmodule Pepe.Trace do
   timeline instead of splitting the run's total duration evenly across events.
   """
   def event(ev) do
-    case {Process.get(@key), encode_event(ev)} do
+    case {Process.get(@key), encode_event(with_sender(ev))} do
       {nil, _} ->
         :ok
 
@@ -150,6 +152,16 @@ defmodule Pepe.Trace do
 
     :ok
   end
+
+  # The run event also names who sent the message, known to `start/5` but not to the runtime.
+  defp with_sender({:run, info} = ev) do
+    case Process.get(@key) do
+      %{sender: sender} when is_binary(sender) -> {:run, Map.put(info, "sender", sender)}
+      _ -> ev
+    end
+  end
+
+  defp with_sender(ev), do: ev
 
   @doc "Persist the accumulated trace for this process and clear it. Returns the id."
   def finish(result) do
@@ -306,11 +318,17 @@ defmodule Pepe.Trace do
   @spec search(String.t(), String.t(), pos_integer(), String.t() | nil) :: [map()]
   def search(scope, query, limit \\ 50, session \\ nil) when is_binary(query) and query != "" do
     needle = String.downcase(query)
+    base = from(t in Trace, where: t.scope == ^scope, order_by: [desc: t.at, desc: t.id]) |> maybe_filter_session(session)
 
-    from(t in Trace, where: t.scope == ^scope, order_by: [desc: t.at])
-    |> maybe_filter_session(session)
-    |> Repo.all()
-    |> Enum.filter(&matches?(&1, needle))
+    # Read in small batches and stop as soon as `limit` matches are found: loading every
+    # trace in the scope with its whole event stream at once is hundreds of MB on a busy
+    # install, enough to get the whole VM killed for memory mid-run.
+    0
+    |> Stream.iterate(&(&1 + @search_batch))
+    |> Stream.map(fn offset -> from(t in base, limit: ^@search_batch, offset: ^offset) |> Repo.all() end)
+    |> Stream.take_while(&(&1 != []))
+    |> Stream.flat_map(& &1)
+    |> Stream.filter(&matches?(&1, needle))
     |> Enum.take(limit)
     |> Enum.map(&summarize/1)
   end
@@ -477,6 +495,10 @@ defmodule Pepe.Trace do
   defp encode_event({:tool_denied, name, reason}),
     do: %{"t" => "tool_denied", "name" => name, "reason" => reason}
 
+  # What this run was set up with (model, provider, tools), recorded once at the start so a
+  # trace says where the run went and not only what it did. See Pepe.Agent.Runtime.
+  defp encode_event({:run, info}) when is_map(info), do: Map.put(info, "t", "run")
+
   defp encode_event({:failover, from, to}), do: %{"t" => "failover", "from" => from, "to" => to}
 
   # The provider had no room left for an answer that big and we asked again for a smaller
@@ -518,7 +540,7 @@ defmodule Pepe.Trace do
   defp clip(nil), do: nil
 
   defp clip(text) when is_binary(text) do
-    if byte_size(text) > @clip, do: binary_part(text, 0, @clip) <> " (clipped)", else: text
+    if byte_size(text) > @clip, do: Pepe.Text.truncate(text, @clip) <> " (clipped)", else: text
   end
 
   defp clip(other), do: clip(inspect(other))

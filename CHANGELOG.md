@@ -5,6 +5,15 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- **A task no longer ends as "interrupted" when a tool's output was cut in the middle of an accented character.** Searching past conversations clipped long prompts by bytes, so a prompt with "ã" or "é" near the cut produced invalid text that broke the model request and the trace save. Every cut of tool output (`session_search`, `bash`, `fetch_url`, `run_script`, `db_query`, trace events) now stops on a character boundary, and anything invalid that still gets through is cleaned before it reaches the model.
+- **Searching past conversations reads traces in small batches** instead of loading every trace of the project at once.
+
+### Added
+
+- **The trace of a task now shows the channel, the conversation, the model and provider used, the fallbacks and how many tools the agent had.**
+
 ## [0.21.2] - 2026-10-22
 
 ### Security

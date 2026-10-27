@@ -205,6 +205,7 @@ defmodule Pepe.Agent.Runtime do
   defp do_run(%Agent{} = agent, messages, opts) do
     reset_run_state(opts)
     chain = resolve_chain(agent, opts)
+    Pepe.Trace.event({:run, run_info(agent, chain)})
 
     case preflight_gate(chain, agent) do
       :ok -> run_chain(agent, chain, messages, opts)
@@ -227,6 +228,26 @@ defmodule Pepe.Agent.Runtime do
 
       model ->
         [model]
+    end
+  end
+
+  # The setup of this run, for the trace: the model it will call first, where that model
+  # lives, the fallbacks behind it and how many tools the agent holds. Never the API key.
+  defp run_info(agent, chain) do
+    case chain do
+      [first | rest] ->
+        %{
+          "agent" => agent.name,
+          "model" => first.name,
+          "model_id" => first.model,
+          "api" => first.api,
+          "host" => URI.parse(first.base_url || "").host,
+          "fallbacks" => Enum.map(rest, & &1.name),
+          "tools" => length(agent.tools || [])
+        }
+
+      [] ->
+        %{"agent" => agent.name, "model" => nil, "fallbacks" => [], "tools" => length(agent.tools || [])}
     end
   end
 
