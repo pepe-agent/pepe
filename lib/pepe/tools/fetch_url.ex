@@ -225,6 +225,6 @@ defmodule Pepe.Tools.FetchUrl do
   defp stringify(body), do: inspect(body)
 
   defp truncate(text, max \\ 30_000) do
-    if byte_size(text) > max, do: binary_part(text, 0, max) <> "\n...(truncated)", else: text
+    if byte_size(text) > max, do: Pepe.Text.truncate(text, max) <> "\n...(truncated)", else: text
   end
 end

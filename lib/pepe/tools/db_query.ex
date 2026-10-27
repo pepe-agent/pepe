@@ -65,6 +65,6 @@ defmodule Pepe.Tools.DbQuery do
   end
 
   defp truncate(text) do
-    if byte_size(text) > @max_result_bytes, do: binary_part(text, 0, @max_result_bytes) <> "\n...(truncated)", else: text
+    if byte_size(text) > @max_result_bytes, do: Pepe.Text.truncate(text, @max_result_bytes) <> "\n...(truncated)", else: text
   end
 end

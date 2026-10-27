@@ -165,7 +165,7 @@ defmodule Pepe.Tools.SessionSearch do
 
   defp clip(nil), do: ""
   defp clip(text) when byte_size(text) <= 80, do: text
-  defp clip(text), do: binary_part(text, 0, 80) <> "…"
+  defp clip(text), do: Pepe.Text.truncate(text, 80) <> "…"
 
   defp describe_transcript(t) do
     header = "#{t["agent"]}  session=#{t["session"] || "-"}  #{get_in(t, ["outcome", "kind"])}\n\nprompt: #{t["prompt"]}\n"

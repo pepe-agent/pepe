@@ -53,6 +53,30 @@ defmodule Pepe.Tools.SessionSearchTest do
     assert out =~ "2 turns"
   end
 
+  test "search: a long prompt with accents is clipped on a character boundary (valid UTF-8)" do
+    # 79 ASCII bytes then "ã" (2 bytes): a byte clip at 80 would cut the "ã" in half.
+    prompt = String.duplicate("a", 79) <> "ãããã final"
+    Trace.start("assistant", nil, prompt)
+    Trace.finish({:ok, "done", []})
+
+    {:ok, out} = SessionSearch.run(%{"action" => "search", "query" => "final"}, ctx())
+    assert String.valid?(out)
+    assert out =~ "aaa"
+  end
+
+  test "search: keeps finding matches past the first batch of traces" do
+    Trace.start("assistant", nil, "needle in the oldest")
+    Trace.finish({:ok, "x", []})
+
+    for i <- 1..45 do
+      Trace.start("assistant", nil, "filler #{i}")
+      Trace.finish({:ok, "x", []})
+    end
+
+    {:ok, out} = SessionSearch.run(%{"action" => "search", "query" => "needle"}, ctx())
+    assert out =~ "needle in the oldest"
+  end
+
   test "search: finds a matching prompt, reports no matches otherwise" do
     Trace.start("assistant", nil, "reconcile the may invoices")
     Trace.finish({:ok, "done", []})

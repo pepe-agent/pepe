@@ -296,6 +296,7 @@ defmodule Pepe.Tools do
   @spec finalize(String.t(), String.t(), map()) :: String.t()
   def finalize(result, name, ctx) do
     result
+    |> Pepe.Text.scrub()
     |> redact(ctx)
     |> scrub_known_secret_values()
     |> scrub_secret_shapes()

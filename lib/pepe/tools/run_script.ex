@@ -149,7 +149,7 @@ defmodule Pepe.Tools.RunScript do
   defp cwd(ctx), do: Workspace.cwd_in_ctx(ctx)
 
   defp truncate(output) when byte_size(output) > @max_output,
-    do: binary_part(output, 0, @max_output) <> "\n...(truncated)"
+    do: Pepe.Text.truncate(output, @max_output) <> "\n...(truncated)"
 
   defp truncate(output), do: output
 end
