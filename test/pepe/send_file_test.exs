@@ -217,7 +217,7 @@ defmodule Pepe.SendFileTest do
     assert opts[:json]["channel_id"] == "C42"
   end
 
-  test "send_file on a dashboard session registers a download token and tells the chat about it", %{xlsx: file} do
+  test "send_file on a dashboard session keeps a copy under a download token and tells the chat about it", %{xlsx: file} do
     key = "web:#{System.unique_integer([:positive])}"
     Phoenix.PubSub.subscribe(Pepe.PubSub, "session:" <> key)
 
@@ -226,7 +226,10 @@ defmodule Pepe.SendFileTest do
     assert msg =~ "leads.xlsx"
 
     assert_received {:session_event, ^key, {:file_ready, token, "leads.xlsx", "here you go"}}
-    assert %{path: ^file, filename: "leads.xlsx"} = Pepe.Store.get(:dashboard_download, token)
+    assert {:ok, %{path: copy, filename: "leads.xlsx"}} = Pepe.ChatFiles.find(token)
+    refute copy == file
+    assert File.read!(copy) == File.read!(file)
+    assert [%{token: ^token, caption: "here you go"}] = Pepe.ChatFiles.list(key)
   end
 
   test "send_file reports a clear error when the file is missing" do

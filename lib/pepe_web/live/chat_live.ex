@@ -15,6 +15,7 @@ defmodule PepeWeb.ChatLive do
   alias Pepe.Agent.SessionPersistence
   alias Pepe.Agent.SessionSupervisor
   alias Pepe.Agent.SessionTitles
+  alias Pepe.ChatFiles
   alias Pepe.Config
   alias Pepe.ModelSwitch
   alias Pepe.Permissions.Prompt
@@ -279,10 +280,15 @@ defmodule PepeWeb.ChatLive do
               <div :if={length(@messages) > @window} class="flex justify-center">
                 <button phx-click="load_older" class={btn_ghost()}>{gettext("Load earlier messages")}</button>
               </div>
-              <.bubble :for={m <- visible(@messages, @window)} role={m.role} content={m.content} />
+              <%!-- Files sit in the transcript at the end of the turn that produced them, so
+                    they scroll up with the conversation instead of piling up under it. --%>
+              <%= for entry <- timeline(@messages, @attachments, @window, @running) do %>
+                <.bubble :if={match?({:message, _}, entry)} role={elem(entry, 1).role} content={elem(entry, 1).content} />
+                <.attachment :if={match?({:file, _}, entry)} token={elem(entry, 1).token} filename={elem(entry, 1).filename} caption={elem(entry, 1).caption} />
+              <% end %>
               <.bubble :if={@running and @streaming != ""} role="assistant" content={@streaming} />
               <.activity :if={(@running or @activity != []) and !@pending_perm and !@pending_ask} running={@running} steps={@activity} />
-              <.attachment :for={a <- @attachments} token={a.token} filename={a.filename} caption={a.caption} />
+              <.attachment :for={a <- running_files(@messages, @attachments, @running)} token={a.token} filename={a.filename} caption={a.caption} />
 
               <div :if={@pending_perm} class="max-w-2xl rounded-xl border border-orange-400/40 bg-orange-400/[.05] p-3">
                 <.perm_question tool={@pending_perm.tool} />
@@ -706,6 +712,7 @@ defmodule PepeWeb.ChatLive do
   def handle_event("delete", %{"key" => key}, socket) do
     SessionSupervisor.terminate(key)
     SessionTitles.delete(key)
+    ChatFiles.delete_session(key)
     socket = assign(socket, sessions: list_sessions(socket.assigns.scope))
 
     if socket.assigns.selected == key do
@@ -1075,7 +1082,12 @@ defmodule PepeWeb.ChatLive do
   # to push a document through like Telegram/WhatsApp/Slack do, so it gets a download link
   # instead, pointing at the token the tool already registered in Pepe.Store.
   defp apply_event({:file_ready, token, filename, caption}, socket),
-    do: update(socket, :attachments, &(&1 ++ [%{token: token, filename: filename, caption: caption}]))
+    do:
+      update(
+        socket,
+        :attachments,
+        &(&1 ++ [%{token: token, filename: filename, caption: caption, turn: turn_count(socket.assigns.messages)}])
+      )
 
   defp apply_event({:permission_request, id, name, requester, tainted?}, socket),
     do: assign(socket, pending_perm: %{id: id, tool: name, pid: requester, tainted: tainted?})
@@ -1162,7 +1174,7 @@ defmodule PepeWeb.ChatLive do
       streaming: "",
       running: false,
       activity: [],
-      attachments: [],
+      attachments: ChatFiles.list(key),
       renaming?: false,
       focus: load_focus(key),
       focus_open: :auto
@@ -1182,6 +1194,45 @@ defmodule PepeWeb.ChatLive do
   # once); "Load earlier messages" widens the window on demand.
   defp visible(messages, window) when length(messages) <= window, do: messages
   defp visible(messages, window), do: Enum.take(messages, -window)
+
+  # A turn starts at each user message. A file belongs to the turn that was current when
+  # the agent produced it.
+  defp turn_count(messages), do: Enum.count(messages, &(&1.role == "user"))
+
+  # The windowed messages, each followed (at the end of its turn) by the files that turn
+  # produced. While a run is live its files are left out here: they render after the
+  # streaming reply instead, so they never sit above text that is still arriving.
+  @doc false
+  def timeline(messages, attachments, window, running?) do
+    live_turn = if running?, do: turn_count(messages)
+
+    messages
+    |> Enum.map_reduce(0, fn m, turn ->
+      turn = if m.role == "user", do: turn + 1, else: turn
+      {{m, turn}, turn}
+    end)
+    |> elem(0)
+    |> visible(window)
+    |> Enum.chunk_every(2, 1, [nil])
+    |> Enum.flat_map(fn [{m, turn}, next] ->
+      end_of_turn? = is_nil(next) or elem(next, 1) != turn
+
+      files =
+        if end_of_turn? and turn != live_turn,
+          do: for(a <- attachments, a.turn == turn, do: {:file, a}),
+          else: []
+
+      [{:message, m} | files]
+    end)
+  end
+
+  # Files not placed by `timeline/4`: those of the turn still running, and any whose turn
+  # the message list doesn't show (before the first user message, or a history read that is
+  # still a turn behind), so a file never vanishes while the transcript catches up.
+  defp running_files(messages, attachments, running?) do
+    live_turn = turn_count(messages)
+    Enum.filter(attachments, &(&1.turn == 0 or &1.turn > live_turn or (running? and &1.turn == live_turn)))
+  end
 
   # Which of the listed models the session is on. `Session.status/1` reports the provider
   # model id (`gpt-a`); the picker lists connection names (`model-a`), so match one to the
@@ -1358,6 +1409,7 @@ defmodule PepeWeb.ChatLive do
       streaming: "",
       running: false,
       activity: [],
+      attachments: [],
       pending_perm: nil,
       pending_ask: nil,
       input: ""

@@ -7,6 +7,7 @@ All notable changes to this project are documented here. Format follows
 
 ### Fixed
 
+- **Files the agent generates in the dashboard chat now appear in the conversation, right after the reply that produced them.** They used to pile up under the whole transcript, so after a few files you could no longer see any text. Each file now scrolls up with the conversation like any other message, and it is still there when you reopen the conversation. The file is kept as a copy for that conversation, and deleting the conversation, `/new` or "Clear conversation" deletes it too (the agent's original is never touched). Download links no longer expire after 24 hours.
 - **A task no longer ends as "interrupted" when a tool's output was cut in the middle of an accented character.** Searching past conversations clipped long prompts by bytes, so a prompt with "ã" or "é" near the cut produced invalid text that broke the model request and the trace save. Every cut of tool output (`session_search`, `bash`, `fetch_url`, `run_script`, `db_query`, trace events) now stops on a character boundary, and anything invalid that still gets through is cleaned before it reaches the model.
 - **Searching past conversations reads traces in small batches** instead of loading every trace of the project at once.
 

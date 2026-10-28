@@ -81,4 +81,50 @@ defmodule PepeWeb.ChatLiveAttachmentTest do
 
     refute render(view) =~ "old.csv"
   end
+
+  test "files come back when the conversation is reopened, and /new deletes them", %{key: key} do
+    src = Path.join(System.tmp_dir!(), "reopen_#{System.unique_integer([:positive])}.csv")
+    File.write!(src, "a,b")
+    on_exit(fn -> File.rm(src) end)
+    {:ok, %{token: token}} = Pepe.ChatFiles.put(key, src, "kept", 1)
+
+    {:ok, view, html} = live(conn(), "/chat?chat=#{key}")
+    assert html =~ ~s(href="/dashboard/files/#{token}")
+
+    view |> form("#chat-compose", %{"text" => "/new"}) |> render_submit()
+
+    refute render(view) =~ token
+    assert Pepe.ChatFiles.list(key) == []
+    assert Pepe.ChatFiles.find(token) == :error
+  end
+
+  test "a file lands after its own turn's reply, above the next question" do
+    messages = [
+      %{role: "user", content: "q1"},
+      %{role: "assistant", content: "a1"},
+      %{role: "user", content: "q2"},
+      %{role: "assistant", content: "a2"}
+    ]
+
+    files = [%{turn: 1, token: "t1"}, %{turn: 2, token: "t2"}]
+
+    assert [
+             {:message, %{content: "q1"}},
+             {:message, %{content: "a1"}},
+             {:file, %{token: "t1"}},
+             {:message, %{content: "q2"}},
+             {:message, %{content: "a2"}},
+             {:file, %{token: "t2"}}
+           ] = PepeWeb.ChatLive.timeline(messages, files, 50, false)
+  end
+
+  test "while a run is live its files are held back for after the streaming reply" do
+    messages = [%{role: "user", content: "q1"}, %{role: "assistant", content: "a1"}, %{role: "user", content: "q2"}]
+    files = [%{turn: 1, token: "t1"}, %{turn: 2, token: "t2"}]
+
+    entries = PepeWeb.ChatLive.timeline(messages, files, 50, true)
+
+    assert Enum.any?(entries, &match?({:file, %{token: "t1"}}, &1))
+    refute Enum.any?(entries, &match?({:file, %{token: "t2"}}, &1))
+  end
 end

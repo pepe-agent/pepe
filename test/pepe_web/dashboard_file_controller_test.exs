@@ -47,9 +47,9 @@ defmodule PepeWeb.DashboardFileControllerTest do
   defp set_password(pw), do: Config.save(Map.put(Config.load(), "dashboard", %{"password" => pw}))
 
   test "streams the registered file as a download, with no password configured", %{xlsx: file} do
-    Pepe.Store.put(:dashboard_download, "tok1", %{path: file, filename: "report.xlsx"})
+    {:ok, %{token: token}} = Pepe.ChatFiles.put("web:t1", file, nil, 1)
 
-    resp = get(conn(), "/dashboard/files/tok1")
+    resp = get(conn(), "/dashboard/files/#{token}")
 
     assert resp.status == 200
     assert resp.resp_body == "fake-xlsx-bytes"
@@ -62,18 +62,18 @@ defmodule PepeWeb.DashboardFileControllerTest do
     assert resp.status == 404
   end
 
-  test "a token whose file was removed from disk since 404s" do
-    missing = Path.join(System.tmp_dir!(), "already_gone_#{System.unique_integer([:positive])}.xlsx")
-    Pepe.Store.put(:dashboard_download, "tok2", %{path: missing, filename: "already_gone.xlsx"})
+  test "a token whose conversation was deleted 404s", %{xlsx: file} do
+    {:ok, %{token: token}} = Pepe.ChatFiles.put("web:t2", file, nil, 1)
+    Pepe.ChatFiles.delete_session("web:t2")
 
-    assert get(conn(), "/dashboard/files/tok2").status == 404
+    assert get(conn(), "/dashboard/files/#{token}").status == 404
   end
 
   test "with a dashboard password set, an unauthenticated request is redirected to /login instead of served", %{xlsx: file} do
     set_password("s3cret")
-    Pepe.Store.put(:dashboard_download, "tok3", %{path: file, filename: "report.xlsx"})
+    {:ok, %{token: token}} = Pepe.ChatFiles.put("web:t3", file, nil, 1)
 
-    resp = get(conn(), "/dashboard/files/tok3")
+    resp = get(conn(), "/dashboard/files/#{token}")
 
     assert redirected_to(resp) == "/login"
   end

@@ -811,6 +811,7 @@ defmodule Pepe.Agent.Session do
     state = state |> cancel_queue({:error, :stopped}) |> cancel_running({:error, :stopped})
 
     Checkpoints.forget_session(state.key)
+    Pepe.ChatFiles.delete_session(state.key)
 
     # A reset also undoes a switch_agent/`/agent` handoff, back to whichever agent this
     # session actually started under (the connection's own default) - the "receptionist"
