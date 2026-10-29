@@ -107,6 +107,8 @@ O cartão de um bot do Telegram lista da mesma forma os grupos, os tópicos de f
 
 É uma decisão permanente, que vale para o canal inteiro, não uma escolha pontual de encaminhamento - por isso está reservada a **formadores** (a mesma lista de confiança que já controla o `/model ... global`); qualquer outra pessoa recebe só um "não tens permissão". Um agente com a ferramenta `manage_channel` consegue fazer o mesmo por linguagem natural ("vincula este canal ao engenheiro, de forma permanente") com as ações `bind_topic`/`unbind_topic` dela - vê [Encaminhamento entre agentes](../routing/) para perceberes a diferença entre isto e o `switch_agent`, que é propositadamente temporário e é desfeito pelo `/new`.
 
+Para encaminhar um canal em que *não* estás a conversar (um agente a configurar o canal de outro agente, por exemplo), o agente usa `bind_channel`/`unbind_channel` do `manage_channel`, indicando o slug da ligação e o id do canal. Ele próprio constrói a chave de encaminhamento, por isso ninguém tem de editar o `config.json` à mão, e aplica-se sem reiniciar.
+
 Para um canal onde ninguém deve poder trocar o agente que responde - nem temporária nem permanentemente - define `agent_switch_locked: true` na ligação. Recusa logo o `/agent NOME`, mesmo para um formador, além do `switch_agent` e das ações `bind_topic`/`unbind_topic` do `manage_channel`, em qualquer conversa dessa ligação. O `/agent` sem argumento (estado), `/mention`, `/model` e `/new` continuam a funcionar normalmente. Define com `--agent-switch-locked` no `mix pepe gateway whatsapp add` / `discord add`, ou diretamente no `config.json`.
 
 ## Mudar de modelo

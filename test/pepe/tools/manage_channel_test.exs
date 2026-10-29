@@ -210,4 +210,39 @@ defmodule Pepe.Tools.ManageChannelTest do
     # Nothing changed - the pre-existing binding is untouched.
     assert Config.channel_agent("telegram:-100777") == "engenheiro"
   end
+
+  test "bind_channel builds the full session key from connection + channel, from any conversation" do
+    Pepe.RepoSetup.start!()
+    Config.put_agent(%Agent{name: "boss", system_prompt: "x", tools: []})
+    Config.put_agent(%Agent{name: "radar", system_prompt: "x", tools: []})
+    Config.put_webhook("SLK", %{"provider" => "slack", "agent" => "boss"})
+
+    # Called from an unrelated Telegram chat - the key must still be the Slack channel's.
+    ctx = %{agent: %Agent{name: "boss"}, session_key: "telegram:1"}
+    args = %{"connection" => "SLK", "channel" => "C1", "agent" => "radar"}
+
+    assert {:ok, msg} = ManageChannel.run(Map.put(args, "action", "bind_channel"), ctx)
+    assert msg =~ "slack:boss:C1"
+    assert Config.channel_agent("slack:boss:C1") == "radar"
+    assert Config.channel_agent("telegram:1") == nil
+
+    # A channel heard from can be listed and bound by its name; the listing shows the routing.
+    Pepe.SeenChannels.touch("SLK", "slack", "C9", name: "sec-radar")
+    assert {:ok, listing} = ManageChannel.run(%{"action" => "list_channels"}, ctx)
+    assert listing =~ "SLK" and listing =~ "C9" and listing =~ "sec-radar"
+    assert {:ok, _} = ManageChannel.run(%{args | "channel" => "#sec-radar"} |> Map.put("action", "bind_channel"), ctx)
+    assert Config.channel_agent("slack:boss:C9") == "radar"
+    assert {:ok, listing} = ManageChannel.run(%{"action" => "list_channels"}, ctx)
+    assert listing =~ "radar"
+
+    assert {:ok, _} = ManageChannel.run(%{"action" => "unbind_channel", "connection" => "SLK", "channel" => "C1"}, ctx)
+    assert Config.channel_agent("slack:boss:C1") == nil
+
+    assert {:error, _} = ManageChannel.run(%{args | "connection" => "nope"} |> Map.put("action", "bind_channel"), ctx)
+    assert {:error, _} = ManageChannel.run(%{args | "agent" => "ghost"} |> Map.put("action", "bind_channel"), ctx)
+
+    Config.put_webhook("LCK", %{"provider" => "slack", "agent" => "boss", "agent_switch_locked" => true})
+    assert {:error, err} = ManageChannel.run(%{args | "connection" => "LCK"} |> Map.put("action", "bind_channel"), ctx)
+    assert err =~ "locked"
+  end
 end

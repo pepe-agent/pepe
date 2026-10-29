@@ -145,6 +145,8 @@ to the engineer, permanently") with its `bind_topic`/`unbind_topic` actions - se
 [Agent-to-agent routing](../routing/) for the difference between this and
 `switch_agent`, which is deliberately temporary and undone by `/new`.
 
+To route a channel you are *not* talking in (an agent setting up another agent's channel, say), the agent uses `manage_channel`'s `bind_channel`/`unbind_channel` with the connection's slug and the channel id. It builds the routing key itself, so nobody has to edit `config.json` by hand, and it takes effect without a restart.
+
 Set `agent_switch_locked: true` on the connection for a channel where nobody should
 ever be able to change which agent answers - neither temporarily nor permanently. It
 refuses `/agent NAME` outright, even for a trainer, plus `switch_agent` and

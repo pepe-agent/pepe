@@ -14,6 +14,7 @@ All notable changes to this project are documented here. Format follows
 
 ### Added
 
+- **An agent can now route a specific channel to an agent without knowing the routing key.** `manage_channel` has new `list_channels` (which connections and channels exist, and where each is routed), `bind_channel` and `unbind_channel` actions that take the connection and the channel (id or name) and build the full key themselves, so setting up "this Slack channel goes to that agent" works from any conversation (before, the agent had to hand-edit `config.json` with the right key and often got it wrong). `bind_topic` now says which conversation it bound.
 - **The trace of a task now shows the channel, the conversation, the model and provider used, the fallbacks and how many tools the agent had.**
 
 ## [0.21.2] - 2026-10-22

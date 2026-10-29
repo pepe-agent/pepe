@@ -1217,14 +1217,12 @@ defmodule PepeWeb.ChatLive do
     |> Enum.flat_map(fn [{m, turn}, next] ->
       end_of_turn? = is_nil(next) or elem(next, 1) != turn
 
-      files =
-        if end_of_turn? and turn != live_turn,
-          do: for(a <- attachments, a.turn == turn, do: {:file, a}),
-          else: []
-
-      [{:message, m} | files]
+      [{:message, m} | turn_files(end_of_turn? and turn != live_turn, attachments, turn)]
     end)
   end
+
+  defp turn_files(true, attachments, turn), do: for(a <- attachments, a.turn == turn, do: {:file, a})
+  defp turn_files(false, _attachments, _turn), do: []
 
   # Files not placed by `timeline/4`: those of the turn still running, and any whose turn
   # the message list doesn't show (before the first user message, or a history read that is

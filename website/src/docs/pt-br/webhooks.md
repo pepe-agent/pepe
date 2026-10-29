@@ -154,6 +154,8 @@ ações `bind_topic`/`unbind_topic` dela - veja
 [Roteamento entre agentes](../routing/) pra entender a diferença entre isso e o
 `switch_agent`, que é propositalmente temporário e desfeito pelo `/new`.
 
+Pra rotear um canal em que você *não* está conversando (um agente configurando o canal de outro agente, por exemplo), o agente usa `bind_channel`/`unbind_channel` do `manage_channel`, passando o slug da conexão e o id do canal. Ele monta a chave de roteamento sozinho, então ninguém precisa editar o `config.json` na mão, e vale sem reiniciar.
+
 Pra um canal onde ninguém deve poder trocar qual agente responde - nem temporária
 nem permanentemente - defina `agent_switch_locked: true` na conexão. Isso recusa
 `/agent NOME` de cara, mesmo para um treinador, além do `switch_agent` e das ações

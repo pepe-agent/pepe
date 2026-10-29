@@ -35,6 +35,7 @@ defmodule Pepe.Tools.ManageChannel do
 
   alias Pepe.Config
   alias Pepe.Project
+  alias Pepe.SeenChannels
 
   # A conventional environment-variable name (so a raw token, which contains ":",
   # is rejected - the agent must reference an env var instead).
@@ -66,7 +67,19 @@ defmodule Pepe.Tools.ManageChannel do
         routing ahead of time. NOT for a user asking to talk to, be connected with, or \
         transferred to another agent right now; that's switch_agent (or the /agent command), \
         never this. Needs `agent`. Refused outright on a channel where agent switching is \
-        locked.
+        locked. It binds the conversation YOU are in right now, never another channel: to \
+        route a DIFFERENT channel (e.g. a Slack channel you are not talking in) use \
+        bind_channel.
+      - list_channels: the webhook connections (Slack, Discord, ...) and the channels each has \
+        heard from - connection slug, channel id, name, and which agent it is routed to. Run \
+        this first to get the slug and id for bind_channel; never guess them.
+      - bind_channel: permanently route one specific channel of a webhook connection (Slack, \
+        Discord, Teams, Google Chat, WhatsApp) to `agent`, from anywhere. Needs `connection` \
+        (the connection's slug, e.g. "A0C5LM7LHS8"), `channel` (the channel id, e.g. \
+        "C0CD1EG9MFC", or its name as listed, e.g. "sec-radar") and `agent`. The routing key is built for you, so NEVER hand-edit \
+        `channel_agents` / `channel_mentions` in config.json and never guess a key. The \
+        result prints the exact key it wrote. No restart needed.
+      - unbind_channel: undo bind_channel - needs `connection` and `channel`.
       - unbind_topic: remove this conversation's agent binding (back to the channel's own \
         default agent).
       - set_trainers: who the bot LEARNS from - needs `name`, `trainers` ("*" = \
@@ -85,7 +98,8 @@ defmodule Pepe.Tools.ManageChannel do
         "properties" => %{
           "action" => %{
             "type" => "string",
-            "enum" => ~w(add list set_agent set_trainers set_heartbeat set_progress bind_topic unbind_topic enable disable remove),
+            "enum" =>
+              ~w(add list set_agent set_trainers set_heartbeat set_progress bind_topic unbind_topic list_channels bind_channel unbind_channel enable disable remove),
             "description" => "What to do."
           },
           "mode" => %{
@@ -99,6 +113,14 @@ defmodule Pepe.Tools.ManageChannel do
             "description" => "NAME of the env var holding the bot token, e.g. \"SALES_BOT_TOKEN\". Never the token itself."
           },
           "agent" => %{"type" => "string", "description" => "Existing agent to bind the bot to."},
+          "connection" => %{
+            "type" => "string",
+            "description" => "For bind_channel/unbind_channel: the webhook connection's slug."
+          },
+          "channel" => %{
+            "type" => "string",
+            "description" => "For bind_channel/unbind_channel: the channel id on that connection (e.g. Slack \"C0123ABC\")."
+          },
           "trainers" => %{
             "type" => "string",
             "description" => "Who the bot learns from: \"*\", \"none\", or \"id1,id2\"."
@@ -136,6 +158,9 @@ defmodule Pepe.Tools.ManageChannel do
       action == "unbind_topic" ->
         unbind_topic(ctx)
 
+      action in ~w(list_channels bind_channel unbind_channel) ->
+        channel_action(action, args, ctx)
+
       true ->
         dispatch(action, args)
     end
@@ -155,9 +180,87 @@ defmodule Pepe.Tools.ManageChannel do
          :ok <- ensure_agent(qualified),
          {:ok, key} <- session_key(ctx) do
       Config.bind_channel_agent(key, qualified)
-      {:ok, "This conversation is now bound to agent #{qualified} - it will answer here from now on, kept across /new and restarts."}
+
+      {:ok,
+       "This conversation (#{key}) is now bound to agent #{qualified} - it will answer here from now on, kept across /new and restarts. " <>
+         "Only THIS conversation changed; to route another channel use bind_channel."}
     end
   end
+
+  # Route one specific channel of a webhook connection, from any conversation. The agent only
+  # names the connection and the channel; the session key (which embeds the provider and the
+  # connection's own default agent, `"slack:default/CarenOps:C1"`) is built here by the same
+  # function the inbound path uses, so it can never drift from what the router later looks up.
+  defp channel_action("list_channels", _args, ctx), do: list_channels(ctx)
+  defp channel_action("bind_channel", args, ctx), do: bind_channel(args, ctx)
+  defp channel_action("unbind_channel", args, ctx), do: unbind_channel(args, ctx)
+
+  defp bind_channel(args, ctx) do
+    with {:ok, agent} <- fetch(args, "agent"),
+         qualified = Project.qualify(agent, ctx.agent.name),
+         :ok <- ensure_same_scope(qualified, ctx.agent.name),
+         :ok <- ensure_agent(qualified),
+         {:ok, key} <- channel_key(args, ctx) do
+      Config.bind_channel_agent(key, qualified)
+
+      {:ok,
+       "Channel #{args["channel"]} of connection #{args["connection"]} is now routed to #{qualified} (key #{key}), kept across /new and restarts."}
+    end
+  end
+
+  defp unbind_channel(args, ctx) do
+    with {:ok, key} <- channel_key(args, ctx) do
+      Config.bind_channel_agent(key, nil)
+      {:ok, "Channel #{args["channel"]} of connection #{args["connection"]} is no longer routed to a specific agent (key #{key})."}
+    end
+  end
+
+  defp channel_key(args, ctx) do
+    with {:ok, slug} <- fetch(args, "connection"),
+         {:ok, channel} <- fetch(args, "channel"),
+         entry when is_map(entry) <- Config.get_webhook(slug) || {:error, "no webhook connection \"#{slug}\""},
+         :ok <- ensure_same_scope(entry["agent"] || "", ctx.agent.name),
+         :ok <- ensure_unlocked(entry) do
+      {:ok, Pepe.Webhooks.session_key(entry, resolve_channel(slug, channel))}
+    end
+  end
+
+  # The id when it was given, else a channel heard from under that name ("#sec-radar" or
+  # "sec-radar"); anything else is taken as an id not heard from yet.
+  defp resolve_channel(slug, given) do
+    wanted = given |> String.trim_leading("#") |> String.downcase()
+    seen = SeenChannels.list(slug)
+
+    case Enum.find(seen, &(&1.channel == given)) || Enum.find(seen, &named?(&1, wanted)) do
+      nil -> given
+      channel -> channel.channel
+    end
+  end
+
+  defp named?(channel, wanted), do: Enum.any?([channel.name, channel.label], &(is_binary(&1) and String.downcase(&1) == wanted))
+
+  # Only the connections of the caller's own project, so a listing never shows another tenant's.
+  defp list_channels(ctx) do
+    rows =
+      for {slug, entry} <- Config.webhooks(),
+          Project.same_scope?(entry["agent"] || "", ctx.agent.name),
+          channel <- SeenChannels.list(slug) do
+        bound = Config.channel_agent(Pepe.Webhooks.session_key(entry, channel.channel)) || "(connection default #{entry["agent"]})"
+        "- #{slug} (#{entry["provider"]}) channel #{channel.channel} #{channel.label || channel.name || ""}: #{bound}"
+      end
+
+    case rows do
+      [] ->
+        {:ok,
+         "No webhook channel heard from yet. A channel shows up here after its first message; its id can still be passed to bind_channel."}
+
+      rows ->
+        {:ok, Enum.join(rows, "\n")}
+    end
+  end
+
+  defp ensure_unlocked(%{"agent_switch_locked" => true}), do: {:error, "agent switching is locked on that connection"}
+  defp ensure_unlocked(_entry), do: :ok
 
   # A bare name resolves inside the calling agent's own project, same as switch_agent; an
   # explicitly cross-project handle ("other/agent") is refused outright, so this can't durably

@@ -64,6 +64,23 @@ replies with exactly `HEARTBEAT_OK` when there's nothing worth saying - that's
 expected most of the time and nothing is sent. A cooldown gate (min 30s spacing, a
 flood breaker at 5 fires/60s) makes a runaway proactive loop impossible.
 
+## Routing a specific channel to an agent (`bind_channel`)
+
+To make a Slack/Discord/Teams/Google Chat/WhatsApp channel answer with a given agent, first run
+`manage_channel action: "list_channels"` (connection slugs, channel ids, names, current routing), then call
+`manage_channel` with `action: "bind_channel" connection: "<webhook slug>" channel: "<channel id>"
+agent: "<name>"` (`channel` may be the id or the listed name). It works from ANY conversation, builds the routing key itself and prints it,
+and applies without a restart. `unbind_channel` undoes it.
+
+- NEVER hand-edit `channel_agents` or `channel_mentions` in `config.json` and never guess a key:
+  the real key embeds the provider and the connection's own default agent
+  (`slack:<connection agent>:<channel id>`), not just the connection slug. A wrong key is saved
+  silently and simply never matches.
+- `bind_topic` is different: it binds the conversation you are talking in right now, so used from
+  Telegram it binds that Telegram chat, not the Slack channel you are setting up.
+- Whether the channel needs an @mention is separate: `manage_pepe gateway mention <slug> --channel <id>`.
+- Verify with a real message in the channel and check the trace; do not announce it works before that.
+
 ## In-chat slash commands (Telegram)
 
 Inside a Telegram chat the user drives the session with slash commands - they don't
