@@ -58,7 +58,7 @@ defmodule Pepe.Sandbox do
       {~r{\bdd\b[^\n]*\bof=/dev/(sd|disk|nvme|hd|xvd|mmcblk)}, "writing raw to a disk device"},
       {~r{>\s*/dev/(sd|disk|nvme|hd|xvd|mmcblk)}, "overwriting a disk device"},
       {~r{:\s*\(\s*\)\s*\{\s*:\s*\|\s*:\s*&\s*\}\s*;\s*:}, "fork bomb"},
-      {~r{\b(shutdown|reboot|halt|poweroff|init\s+0)\b}, "powering off or rebooting the host"}
+      {~r{(?<![\w-])(shutdown|reboot|halt|poweroff|init\s+0)\b}, "powering off or rebooting the host"}
     ]
   end
 
@@ -66,14 +66,15 @@ defmodule Pepe.Sandbox do
   # driving the `pepe`/`mix pepe` CLI, or evaluating Pepe modules directly. The agent changes
   # config through `config_set`/`manage_pepe`/`manage_agent` (which the permission gate sees);
   # the same change via the shell would flip `auto_approve`, the dashboard password, or a model
-  # key with no gate at all. Matched only at command position, so `echo pepe` or a path like
-  # `./bin/pepe-helper` is untouched. A static check, not a boundary - an obfuscated invocation
+  # key with no gate at all. Matched only at command position (an absolute path such as
+  # `/app/bin/pepe restart` counts, it killed the very run issuing it), so `echo pepe` or a
+  # path like `./bin/pepe-helper` is untouched. A static check, not a boundary - an obfuscated invocation
   # can still slip past, exactly like the catastrophic guard.
   @cmd_start ~S"(?:^|[;&|`(]|\$\()\s*(?:sudo\s+|env\s+\S+=\S+\s+|exec\s+|nohup\s+|command\s+|time\s+)*"
 
   defp self_management_patterns do
     [
-      {Regex.compile!(@cmd_start <> ~S"(?:mix\s+pepe|pepe)\b"),
+      {Regex.compile!(@cmd_start <> ~S"(?:mix\s+pepe|(?:\S*/)?pepe(?![\w.-]))"),
        "reconfiguring Pepe through the `pepe` CLI is not allowed from the shell - use the " <>
          "config_set / manage_pepe / manage_agent tools, which the permission gate can see"},
       {~r/\b(?:elixir|iex)\b[^\n]*\s-e\b[^\n]*Pepe\./,

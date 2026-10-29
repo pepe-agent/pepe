@@ -39,6 +39,8 @@ defmodule Pepe.SandboxTest do
           "pepe agent add evil --admin",
           "ls; pepe dashboard password s3cret",
           "sudo pepe manage add",
+          "/app/bin/pepe restart",
+          "set -e; ./bin/pepe pid",
           "elixir -e 'Pepe.Config.save(%{})'"
         ] do
       assert {:block, _} = Sandbox.guard(cmd), "should block self-management: #{cmd}"
@@ -58,7 +60,8 @@ defmodule Pepe.SandboxTest do
           "python3 gen.py > out.xlsx",
           "rm -rf ./build",
           "curl https://api.example.com | jq .",
-          "ls -la"
+          "ls -la",
+          "elixir --no-halt script.exs"
         ] do
       assert :ok = Sandbox.guard(cmd), "should allow: #{cmd}"
     end
