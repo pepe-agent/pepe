@@ -14,7 +14,7 @@ defmodule Pepe.Agent.SessionSupervisor do
 
   @doc "All live session keys, registered in `Pepe.Agent.Registry`."
   def list do
-    Registry.select(Pepe.Agent.Registry, [{{:"$1", :_, :_}, [], [:"$1"]}])
+    Registry.select(Pepe.Agent.Registry, [{{:"$1", :_, :_}, [{:is_binary, :"$1"}], [:"$1"]}])
   end
 
   @doc "Terminate a session (and forget its permission grants + persisted file)."
