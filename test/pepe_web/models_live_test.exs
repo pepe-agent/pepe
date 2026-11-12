@@ -251,4 +251,98 @@ defmodule PepeWeb.ModelsLiveTest do
     assert render_click(view, "oauth_reconnect", %{"name" => "primary"}) =~
              "a subscription connection."
   end
+
+  defmodule PingPlug do
+    @moduledoc false
+    import Plug.Conn
+
+    def init(opts), do: opts
+
+    # `/bad/...` answers like a provider rejecting the key; anything else is a healthy completion.
+    def call(%{request_path: "/bad" <> _} = conn, _opts) do
+      body = Jason.encode!(%{"error" => %{"message" => "Incorrect API key provided"}})
+      conn |> put_resp_content_type("application/json") |> send_resp(401, body)
+    end
+
+    def call(conn, _opts) do
+      body = Jason.encode!(%{"choices" => [%{"message" => %{"role" => "assistant", "content" => "pong"}, "finish_reason" => "stop"}]})
+      conn |> put_resp_content_type("application/json") |> send_resp(200, body)
+    end
+  end
+
+  # The ping runs off the LiveView process, so its result lands a moment after the click.
+  defp await_html(view, text, tries \\ 100) do
+    html = render(view)
+
+    cond do
+      html =~ text -> html
+      tries == 0 -> flunk("never rendered #{inspect(text)}:\n#{html}")
+      true -> Process.sleep(50) && await_html(view, text, tries - 1)
+    end
+  end
+
+  describe "testing a connection" do
+    setup do
+      server = start_supervised!({Bandit, plug: PingPlug, port: 0, scheme: :http})
+      {:ok, {_addr, port}} = ThousandIsland.listener_info(server)
+      %{base: "http://localhost:#{port}"}
+    end
+
+    test "a working connection reports that it works, with the round-trip time", %{base: base} do
+      model_fixture("primary", %{base_url: base <> "/ok"})
+      {:ok, view, html} = live(conn(), "/models")
+      assert html =~ "Test"
+
+      render_click(view, "model_test", %{"name" => "primary"})
+
+      html = await_html(view, "Works")
+      assert html =~ " ms"
+      refute html =~ "Failed"
+    end
+
+    test "a rejected key shows Failed with the provider's own reason", %{base: base} do
+      model_fixture("primary", %{base_url: base <> "/bad"})
+      {:ok, view, _html} = live(conn(), "/models")
+
+      render_click(view, "model_test", %{"name" => "primary"})
+
+      html = await_html(view, "Failed")
+      assert html =~ "HTTP 401: Incorrect API key provided"
+    end
+
+    test "an unreachable endpoint fails instead of hanging on Testing..." do
+      # Nothing listens on port 1. Req retries a refused connection with backoff (1+2+4 s), so the
+      # failure lands after ~7 s: allow for it.
+      model_fixture("primary", %{base_url: "http://localhost:1"})
+      {:ok, view, _html} = live(conn(), "/models")
+
+      render_click(view, "model_test", %{"name" => "primary"})
+
+      assert await_html(view, "Failed", 300) =~ "Failed"
+    end
+
+    test "testing one connection leaves the others untouched", %{base: base} do
+      model_fixture("good", %{base_url: base <> "/ok"})
+      model_fixture("other", %{base_url: base <> "/ok"})
+      {:ok, view, _html} = live(conn(), "/models")
+
+      render_click(view, "model_test", %{"name" => "good"})
+      await_html(view, "Works")
+
+      assert view |> element("[phx-click=model_test][phx-value-name=other]") |> render() =~ "Test"
+      assert render(view) |> String.split("Works") |> length() == 2
+    end
+
+    test "a decision-only connection has no Test button" do
+      model_fixture("jev", %{api: Pepe.Decide.Jev.api()})
+      {:ok, view, _html} = live(conn(), "/models")
+
+      refute has_element?(view, "[phx-click=model_test][phx-value-name=jev]")
+    end
+
+    test "testing a connection that no longer exists is a no-op" do
+      {:ok, view, _html} = live(conn(), "/models")
+      assert render_click(view, "model_test", %{"name" => "ghost"})
+    end
+  end
 end

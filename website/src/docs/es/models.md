@@ -41,6 +41,8 @@ pinging openrouter (openai/gpt-5-chat)...
 
 El panel puede hacer todo esto también, en su pestaña Modelos, si prefieres un formulario a la línea de comandos.
 
+Allí, cada conexión tiene además un botón **Probar**. Envía un mensaje mínimo por la conexión y muestra en la propia tarjeta si funcionó, y cuánto tardó la respuesta, o por qué falló, con las palabras del propio proveedor (clave incorrecta, modelo que no existe, dirección que nadie atiende). Es la forma más rápida de comprobar una clave antes de poner un agente a usarla.
+
 ### Renombrar una conexión
 
 ```bash

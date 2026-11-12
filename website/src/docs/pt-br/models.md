@@ -41,6 +41,8 @@ pinging openrouter (openai/gpt-5-chat)...
 
 Prefere um formulário à linha de comando? O painel faz tudo isso também, na aba Modelos.
 
+Lá, cada conexão tem ainda um botão **Testar**. Ele manda uma mensagem mínima pela conexão e mostra no próprio cartão se funcionou, e em quanto tempo veio a resposta, ou por que falhou, com as palavras do próprio provedor (chave errada, modelo que não existe, endereço que ninguém atende). É o jeito mais rápido de conferir uma chave antes de colocar um agente nela.
+
 ### Renomeando uma conexão
 
 ```bash

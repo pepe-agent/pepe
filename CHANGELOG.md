@@ -5,11 +5,16 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+### Added
+
+- **A "Test" button on every model connection** (Models page). It sends one tiny `ping` through the connection and shows right on the card whether it works (with the round-trip time) or why it failed, using the provider's own message (for example "HTTP 401: Incorrect API key provided"). It runs outside the agent loop, so a test never puts a connection on cooldown. Decision-only connections have no button, since they can't chat.
+
 ### Fixed
 
 - **An agent can no longer restart Pepe from inside its own task by calling the `pepe` binary with its full path** (for example `/app/bin/pepe restart`), which killed the running conversation and left it as "interrupted". The shell guard also stops mistaking `--no-halt` for a host shutdown.
 - **Files the agent generates in the dashboard chat now appear in the conversation, right after the reply that produced them.** They used to pile up under the whole transcript, so after a few files you could no longer see any text. Each file now scrolls up with the conversation like any other message, and it is still there when you reopen the conversation. The file is kept as a copy for that conversation, and deleting the conversation, `/new` or "Clear conversation" deletes it too (the agent's original is never touched). Download links no longer expire after 24 hours.
 - **A task no longer ends as "interrupted" when a tool's output was cut in the middle of an accented character.** Searching past conversations clipped long prompts by bytes, so a prompt with "ã" or "é" near the cut produced invalid text that broke the model request and the trace save. Every cut of tool output (`session_search`, `bash`, `fetch_url`, `run_script`, `db_query`, trace events) now stops on a character boundary, and anything invalid that still gets through is cleaned before it reaches the model.
+- **The chat sidebar no longer crashes while a task is running.** A run in progress was being listed as if it were a conversation, which broke the conversation list every few seconds and also inflated the live session count on the overview. (#37, by LG, @latesh)
 - **Searching past conversations reads traces in small batches** instead of loading every trace of the project at once.
 
 ### Added

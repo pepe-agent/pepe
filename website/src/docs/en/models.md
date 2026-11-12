@@ -47,6 +47,8 @@ pinging openrouter (openai/gpt-5-chat)...
 The dashboard can do all of this too, under its Models tab, if you prefer a form
 over the command line.
 
+Each connection there also has a **Test** button. It sends one tiny message through the connection and tells you right on the card whether it works, and how long the answer took, or why it failed, in the provider's own words (a wrong key, a model that does not exist, an address nobody answers). It is the quickest way to check a key before putting an agent on it.
+
 ### Rename a connection
 
 ```bash

@@ -41,6 +41,8 @@ pinging openrouter (openai/gpt-5-chat)...
 
 O painel também faz tudo isto, no separador Modelos, caso prefiras um formulário à linha de comandos.
 
+Lá, cada ligação tem ainda um botão **Testar**. Envia uma mensagem mínima pela ligação e mostra no próprio cartão se funcionou, e quanto tempo demorou a resposta, ou porque falhou, pelas palavras do próprio fornecedor (chave errada, modelo que não existe, endereço a que ninguém responde). É a forma mais rápida de confirmar uma chave antes de pores um agente a usá-la.
+
 ### Renomear uma ligação
 
 ```bash

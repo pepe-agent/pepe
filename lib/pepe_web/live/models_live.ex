@@ -21,9 +21,74 @@ defmodule PepeWeb.ModelsLive do
        models: Config.models(),
        default_model: Config.default_model_name(),
        edit_model: nil,
-       oauth: nil
+       oauth: nil,
+       # Connection name => :running | {:ok, ms} | {:error, text}: the last "Test" ping per card.
+       tests: %{}
      )}
   end
+
+  # A ping that hasn't answered by now is reported as failed instead of spinning forever. The
+  # request itself gives up sooner (`receive_timeout`), this also covers its transient retries.
+  @ping_timeout_ms 45_000
+
+  attr :result, :any, required: true
+
+  # The badge a card shows for its last test ping.
+  defp test_badge(%{result: :running} = assigns) do
+    ~H"""
+    <span class={[tag(:muted), "ml-2"]}>{gettext("Testing...")}</span>
+    """
+  end
+
+  defp test_badge(%{result: {:ok, _ms}} = assigns) do
+    ~H"""
+    <span class={[tag(:ok), "ml-2"]}>{gettext("Works")} ({elem(@result, 1)} ms)</span>
+    """
+  end
+
+  defp test_badge(%{result: {:error, _text}} = assigns) do
+    ~H"""
+    <span class={[tag(:danger), "ml-2"]}>{gettext("Failed")}</span>
+    """
+  end
+
+  # One tiny completion, off the LiveView process: proves the key, the endpoint and the model id
+  # all work together without touching the agent loop (so it never trips a connection's cooldown).
+  defp spawn_model_test(%Pepe.Config.Model{} = model) do
+    parent = self()
+    spawn(fn -> send(parent, {:model_tested, model.name, ping(model)}) end)
+  end
+
+  defp ping(model) do
+    started = System.monotonic_time(:millisecond)
+
+    # Task.async links to the caller, so a crash inside would take this process down with it and
+    # the card would be stuck on "Testing...". The rescue/catch turns every failure into a result.
+    task =
+      Task.async(fn ->
+        try do
+          Pepe.LLM.chat(model, [%{"role" => "user", "content" => "ping"}], max_tokens: 16, receive_timeout: 20_000)
+        rescue
+          e -> {:error, Exception.message(e)}
+        catch
+          kind, reason -> {:error, inspect({kind, reason})}
+        end
+      end)
+
+    case Task.yield(task, @ping_timeout_ms) || Task.shutdown(task, :brutal_kill) do
+      {:ok, {:ok, _result}} -> {:ok, System.monotonic_time(:millisecond) - started}
+      {:ok, {:error, reason}} -> {:error, ping_error(reason)}
+      _ -> {:error, gettext("No answer within %{seconds} seconds.", seconds: div(@ping_timeout_ms, 1000))}
+    end
+  end
+
+  # The provider's own "why" when it sent one ("Incorrect API key provided"), else the raw reason.
+  defp ping_error({:http_error, status, %{"error" => %{"message" => msg}}}) when is_binary(msg), do: "HTTP #{status}: #{msg}"
+  defp ping_error({:http_error, status, %{"error" => msg}}) when is_binary(msg), do: "HTTP #{status}: #{msg}"
+  defp ping_error({:http_error, status, _body}), do: "HTTP #{status}"
+  defp ping_error(%{__exception__: true} = e), do: Exception.message(e)
+  defp ping_error(reason) when is_binary(reason), do: reason
+  defp ping_error(reason), do: inspect(reason)
 
   # Per-model billing prices: manual override with the auto/known price as placeholder.
   attr :edit_model, :map, required: true
@@ -243,8 +308,14 @@ defmodule PepeWeb.ModelsLive do
                 <span class="font-medium">{m.name}</span>
                 <span :if={m.name == @default_model} class={[tag(:ok), "ml-2"]}>{gettext("default")}</span>
                 <span :if={Pepe.Config.Model.decision?(m)} class={[tag(:muted), "ml-2"]}>{gettext("Decisions only")}</span>
+                <.test_badge :if={@tests[m.name]} result={@tests[m.name]} />
+                <p :if={match?({:error, _}, @tests[m.name])} class="mt-1 break-words text-sm text-red-400">
+                  {String.slice(elem(@tests[m.name], 1), 0, 300)}
+                </p>
               </div>
               <div class="flex shrink-0 flex-wrap gap-1 text-sm">
+                <%!-- A decision-only connection can't chat, so there's nothing to ping. --%>
+                <button :if={not Pepe.Config.Model.decision?(m)} phx-click="model_test" phx-value-name={m.name} disabled={@tests[m.name] == :running} class={[btn_ghost(), "disabled:opacity-50"]}>{gettext("Test")}</button>
                 <button :if={is_map(m.oauth)} phx-click="oauth_reconnect" phx-value-name={m.name} class={btn_ghost()}>{gettext("Reconnect")}</button>
                 <button phx-click="model_edit" phx-value-name={m.name} class={btn_ghost()}>{gettext("Edit")}</button>
                 <button :if={m.name != @default_model and not Pepe.Config.Model.decision?(m)} phx-click="model_default" phx-value-name={m.name} class={btn_ghost()}>{gettext("Set default")}</button>
@@ -505,7 +576,29 @@ defmodule PepeWeb.ModelsLive do
   def handle_event("model_delete", %{"name" => name}, socket) do
     Config.delete_model(name)
 
-    {:noreply, assign(socket, models: Config.models(), default_model: Config.default_model_name())}
+    {:noreply,
+     assign(socket,
+       models: Config.models(),
+       default_model: Config.default_model_name(),
+       tests: Map.delete(socket.assigns.tests, name)
+     )}
+  end
+
+  # A ping already in flight for this connection is left alone (a double click must not
+  # fire two requests).
+  def handle_event("model_test", %{"name" => name}, socket) do
+    case Config.get_model(name) do
+      %Pepe.Config.Model{} = m ->
+        if Pepe.Config.Model.decision?(m) or socket.assigns.tests[m.name] == :running do
+          {:noreply, socket}
+        else
+          spawn_model_test(m)
+          {:noreply, assign(socket, tests: Map.put(socket.assigns.tests, m.name, :running))}
+        end
+
+      nil ->
+        {:noreply, socket}
+    end
   end
 
   # A decision-only connection cannot be the default: the default is what conversations run on.
@@ -702,6 +795,15 @@ defmodule PepeWeb.ModelsLive do
     case socket.assigns.edit_model do
       %{provider: ^provider} = m -> {:noreply, assign(socket, edit_model: %{m | models: ids})}
       _ -> {:noreply, socket}
+    end
+  end
+
+  # A result for a card that was deleted while its ping was in flight is dropped, not resurrected.
+  def handle_info({:model_tested, name, result}, socket) do
+    if Config.get_model(name) do
+      {:noreply, assign(socket, tests: Map.put(socket.assigns.tests, name, result))}
+    else
+      {:noreply, socket}
     end
   end
 
