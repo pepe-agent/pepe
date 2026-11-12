@@ -5,9 +5,13 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+## [0.22.0] - 2026-11-12
+
 ### Added
 
 - **A "Test" button on every model connection** (Models page). It sends one tiny `ping` through the connection and shows right on the card whether it works (with the round-trip time) or why it failed, using the provider's own message (for example "HTTP 401: Incorrect API key provided"). It runs outside the agent loop, so a test never puts a connection on cooldown. Decision-only connections have no button, since they can't chat.
+- **An agent can now route a specific channel to an agent without knowing the routing key.** `manage_channel` has new `list_channels` (which connections and channels exist, and where each is routed), `bind_channel` and `unbind_channel` actions that take the connection and the channel (id or name) and build the full key themselves, so setting up "this Slack channel goes to that agent" works from any conversation (before, the agent had to hand-edit `config.json` with the right key and often got it wrong). `bind_topic` now says which conversation it bound.
+- **The trace of a task now shows the channel, the conversation, the model and provider used, the fallbacks and how many tools the agent had.**
 
 ### Fixed
 
@@ -16,11 +20,6 @@ All notable changes to this project are documented here. Format follows
 - **A task no longer ends as "interrupted" when a tool's output was cut in the middle of an accented character.** Searching past conversations clipped long prompts by bytes, so a prompt with "ã" or "é" near the cut produced invalid text that broke the model request and the trace save. Every cut of tool output (`session_search`, `bash`, `fetch_url`, `run_script`, `db_query`, trace events) now stops on a character boundary, and anything invalid that still gets through is cleaned before it reaches the model.
 - **The chat sidebar no longer crashes while a task is running.** A run in progress was being listed as if it were a conversation, which broke the conversation list every few seconds and also inflated the live session count on the overview. (#37, by LG, @latesh)
 - **Searching past conversations reads traces in small batches** instead of loading every trace of the project at once.
-
-### Added
-
-- **An agent can now route a specific channel to an agent without knowing the routing key.** `manage_channel` has new `list_channels` (which connections and channels exist, and where each is routed), `bind_channel` and `unbind_channel` actions that take the connection and the channel (id or name) and build the full key themselves, so setting up "this Slack channel goes to that agent" works from any conversation (before, the agent had to hand-edit `config.json` with the right key and often got it wrong). `bind_topic` now says which conversation it bound.
-- **The trace of a task now shows the channel, the conversation, the model and provider used, the fallbacks and how many tools the agent had.**
 
 ## [0.21.2] - 2026-10-22
 
@@ -996,6 +995,9 @@ stack. No database - configuration lives in a JSON file, working state in Mnesia
   (en, pt-BR, pt-PT, es) and validates required channel credentials before
   saving a connection.
 
+[0.22.0]: https://github.com/pepe-agent/pepe/compare/v0.21.2...v0.22.0
+[0.21.2]: https://github.com/pepe-agent/pepe/compare/v0.21.1...v0.21.2
+[0.21.1]: https://github.com/pepe-agent/pepe/compare/v0.21.0...v0.21.1
 [0.21.0]: https://github.com/pepe-agent/pepe/compare/v0.20.0...v0.21.0
 [0.20.0]: https://github.com/pepe-agent/pepe/compare/v0.19.1...v0.20.0
 [0.19.1]: https://github.com/pepe-agent/pepe/compare/v0.19.0...v0.19.1
