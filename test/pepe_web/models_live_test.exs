@@ -284,6 +284,19 @@ defmodule PepeWeb.ModelsLiveTest do
       refute html =~ "Signed in."
     end
 
+    test "a finished Test picks up what the renewal it triggered did to the sign-in" do
+      subscription_fixture(%{"expires_at" => 2_208_988_800})
+      {:ok, view, html} = live(conn(), "/models")
+      assert html =~ "Signed in."
+
+      # Testing a subscription renews its token first; here the provider refused.
+      stored = Config.get_model("sub")
+      Config.put_model(%{stored | oauth: Map.put(stored.oauth, "refresh_failed_at", 1_577_923_200)})
+      send(view.pid, {:model_tested, "sub", {:error, "HTTP 401"}})
+
+      assert render(view) =~ "Sign in again (Reconnect)"
+    end
+
     test "an unknown expiry still says the connection is signed in" do
       subscription_fixture(%{"expires_at" => nil})
 

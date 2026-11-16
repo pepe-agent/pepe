@@ -831,9 +831,12 @@ defmodule PepeWeb.ModelsLive do
   end
 
   # A result for a card that was deleted while its ping was in flight is dropped, not resurrected.
+  #
+  # The models are reloaded with it: testing a subscription connection renews its token first,
+  # which can change what the card's sign-in line has to say (renewed, or refused).
   def handle_info({:model_tested, name, result}, socket) do
     if Config.get_model(name) do
-      {:noreply, assign(socket, tests: Map.put(socket.assigns.tests, name, result))}
+      {:noreply, assign(socket, models: Config.models(), tests: Map.put(socket.assigns.tests, name, result))}
     else
       {:noreply, socket}
     end

@@ -29,6 +29,11 @@ defmodule Pepe.OAuthTest do
           |> Plug.Conn.put_resp_content_type("application/json")
           |> Plug.Conn.send_resp(400, ~s({"error":"invalid_grant"}))
 
+        {:status, status, body} ->
+          conn
+          |> Plug.Conn.put_resp_content_type("application/json")
+          |> Plug.Conn.send_resp(status, Jason.encode!(body))
+
         body ->
           conn
           |> Plug.Conn.put_resp_content_type("application/json")
@@ -396,6 +401,40 @@ defmodule Pepe.OAuthTest do
       first = %{stamped | oauth: Map.put(stamped.oauth, "refresh_failed_at", 1)}
       Config.put_model(first)
       assert OAuth.ensure_fresh(Config.get_model("sub")).oauth["refresh_failed_at"] == 1
+    end
+
+    test "a 401 is a refusal too, whatever the body says", %{token_url: url} do
+      answers({:status, 401, %{"error" => %{"code" => "token_revoked"}}})
+      Config.put_model(expiring_model(url, 10))
+
+      assert is_integer(OAuth.ensure_fresh(Config.get_model("sub")).oauth["refresh_failed_at"])
+    end
+
+    test "an answer that is not about the refresh token is not stamped", %{token_url: url} do
+      # A rate limit passes on its own, and a malformed request is not fixed by signing in again.
+      for answer <- [{:status, 429, %{"error" => "slow_down"}}, {:status, 400, %{"error" => "invalid_request"}}] do
+        answers(answer)
+        Config.put_model(expiring_model(url, 10))
+
+        assert OAuth.ensure_fresh(Config.get_model("sub")).api_key == "old-access"
+        refute Map.has_key?(Config.get_model("sub").oauth, "refresh_failed_at")
+      end
+    end
+
+    test "a refusal of an old token does not overwrite a sign-in that landed meanwhile", %{token_url: url} do
+      answers(:fail)
+      Config.put_model(expiring_model(url, 10))
+      in_flight = Config.get_model("sub")
+
+      # The operator reconnects while the call holding the old token is still out.
+      Config.put_model(%{in_flight | api_key: "new-access", oauth: Map.put(in_flight.oauth, "refresh", "new-refresh")})
+
+      OAuth.ensure_fresh(in_flight)
+
+      stored = Config.get_model("sub")
+      assert stored.api_key == "new-access"
+      assert stored.oauth["refresh"] == "new-refresh"
+      refute Map.has_key?(stored.oauth, "refresh_failed_at")
     end
 
     test "a renewal that could not reach the provider is not stamped" do
