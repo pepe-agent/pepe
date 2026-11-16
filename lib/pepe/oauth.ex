@@ -163,8 +163,13 @@ defmodule Pepe.OAuth do
   # a refresh token that is invalid, expired or revoked (RFC 6749, 5.2); the other errors that
   # share its 400 (`invalid_request`, `unsupported_grant_type`, ...) are about the request, and
   # signing in again would not fix them. A 401 or 403 is a provider saying the same thing
-  # without the standard body. Everything else (429, 408, 5xx, no answer) can pass on its own.
+  # without the standard body, unless it names one of those other errors: a 401 `invalid_client`
+  # is the client's own authentication failing, not the refresh token. Everything else (429,
+  # 408, 5xx, no answer) can pass on its own.
+  @not_about_the_token ~w(invalid_client unauthorized_client invalid_request unsupported_grant_type invalid_scope)
+
   defp refused?({:refresh_http, 400, %{"error" => "invalid_grant"}}), do: true
+  defp refused?({:refresh_http, status, %{"error" => error}}) when status in [401, 403] and error in @not_about_the_token, do: false
   defp refused?({:refresh_http, status, _body}) when status in [401, 403], do: true
   defp refused?(_reason), do: false
 

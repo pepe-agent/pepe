@@ -412,7 +412,12 @@ defmodule Pepe.OAuthTest do
 
     test "an answer that is not about the refresh token is not stamped", %{token_url: url} do
       # A rate limit passes on its own, and a malformed request is not fixed by signing in again.
-      for answer <- [{:status, 429, %{"error" => "slow_down"}}, {:status, 400, %{"error" => "invalid_request"}}] do
+      # Nor is a 401 that names the client's own authentication (RFC 6749, 5.2).
+      for answer <- [
+            {:status, 429, %{"error" => "slow_down"}},
+            {:status, 400, %{"error" => "invalid_request"}},
+            {:status, 401, %{"error" => "invalid_client"}}
+          ] do
         answers(answer)
         Config.put_model(expiring_model(url, 10))
 
