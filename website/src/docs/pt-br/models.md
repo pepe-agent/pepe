@@ -43,6 +43,8 @@ Prefere um formulário à linha de comando? O painel faz tudo isso também, na a
 
 Lá, cada conexão tem ainda um botão **Testar**. Ele manda uma mensagem mínima pela conexão e mostra no próprio cartão se funcionou, e em quanto tempo veio a resposta, ou por que falhou, com as palavras do próprio provedor (chave errada, modelo que não existe, endereço que ninguém atende). É o jeito mais rápido de conferir uma chave antes de colocar um agente nela.
 
+Uma conexão feita com login de assinatura (ChatGPT, Claude) mostra também uma linha **Login**. O token que a assinatura entrega dura pouco, e o Pepe renova sozinho, então a linha diz até quando o atual vale e que você não precisa fazer nada. O único caso que depende de você é quando o provedor recusa a renovação, porque a assinatura venceu ou o acesso foi revogado: a linha fica vermelha e pede para você entrar de novo em **Reconectar**.
+
 ### Renomeando uma conexão
 
 ```bash

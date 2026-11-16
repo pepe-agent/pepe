@@ -354,6 +354,32 @@ defmodule Pepe.Config do
     end
   end
 
+  @doc """
+  Record that the provider refused to renew `model`'s subscription sign-in, at unix time `at`.
+
+  A conditional write on the **stored** connection, not a save of `model`: the caller's copy
+  was loaded before a network call, and a Reconnect may have saved new tokens since. It only
+  adds `"refresh_failed_at"`, and only when the stored refresh token is still the one that
+  was refused and no stamp is there yet. Returns `:ok` when it stamped, `:unchanged` otherwise.
+  """
+  @spec stamp_refresh_failure(Model.t(), integer()) :: :ok | :unchanged
+  def stamp_refresh_failure(%Model{id: id, oauth: %{"refresh" => refused}}, at) when is_binary(id) and is_integer(at) do
+    result =
+      update_cas(fn config ->
+        case get_in(config, ["models", id, "oauth"]) do
+          %{"refresh" => ^refused} = stored when not is_map_key(stored, "refresh_failed_at") ->
+            {:ok, put_in(config, ["models", id, "oauth", "refresh_failed_at"], at)}
+
+          _ ->
+            {:error, :unchanged}
+        end
+      end)
+
+    if match?({:ok, _}, result), do: :ok, else: :unchanged
+  end
+
+  def stamp_refresh_failure(_model, _at), do: :unchanged
+
   # See `do_put_agent/2`'s comment: the collision check and the write must share one
   # `update_cas/1` call, or two concurrent case-variant creates could both pass a
   # separately-loaded check and then both write.

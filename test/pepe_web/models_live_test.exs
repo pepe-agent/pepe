@@ -243,6 +243,69 @@ defmodule PepeWeb.ModelsLiveTest do
     assert html =~ "Choose a provider..."
   end
 
+  describe "a subscription connection's sign-in line" do
+    defp subscription_fixture(oauth) do
+      model_fixture("sub", %{oauth: Map.merge(%{"provider" => "openai", "refresh" => "r"}, oauth)})
+    end
+
+    test "a connection with an API key has no sign-in line" do
+      model_fixture("primary")
+
+      {:ok, _view, html} = live(conn(), "/models")
+
+      refute html =~ "Signed in."
+    end
+
+    test "a valid token says until when, and that it renews on its own" do
+      # 2040-01-01 00:00:00 UTC
+      subscription_fixture(%{"expires_at" => 2_208_988_800})
+
+      {:ok, _view, html} = live(conn(), "/models")
+
+      assert html =~ "The current token is valid until 2040-01-01 00:00 UTC and renews on its own after that."
+    end
+
+    test "an expired token is not a problem by itself: it renews with the next message" do
+      # 2020-01-01 00:00:00 UTC
+      subscription_fixture(%{"expires_at" => 1_577_836_800})
+
+      {:ok, _view, html} = live(conn(), "/models")
+
+      assert html =~ "The token expired on 2020-01-01 00:00 UTC and renews on its own with the next message."
+      refute html =~ "Sign in again"
+    end
+
+    test "a renewal the provider refused asks for a new sign-in" do
+      subscription_fixture(%{"expires_at" => 1_577_836_800, "refresh_failed_at" => 1_577_923_200})
+
+      {:ok, _view, html} = live(conn(), "/models")
+
+      assert html =~ "Sign in again (Reconnect): the provider refused to renew this sign-in on 2020-01-02 00:00 UTC."
+      refute html =~ "Signed in."
+    end
+
+    test "a finished Test picks up what the renewal it triggered did to the sign-in" do
+      subscription_fixture(%{"expires_at" => 2_208_988_800})
+      {:ok, view, html} = live(conn(), "/models")
+      assert html =~ "Signed in."
+
+      # Testing a subscription renews its token first; here the provider refused.
+      stored = Config.get_model("sub")
+      Config.put_model(%{stored | oauth: Map.put(stored.oauth, "refresh_failed_at", 1_577_923_200)})
+      send(view.pid, {:model_tested, "sub", {:error, "HTTP 401"}})
+
+      assert render(view) =~ "Sign in again (Reconnect)"
+    end
+
+    test "an unknown expiry still says the connection is signed in" do
+      subscription_fixture(%{"expires_at" => nil})
+
+      {:ok, _view, html} = live(conn(), "/models")
+
+      assert html =~ "Signed in. The token renews on its own."
+    end
+  end
+
   test "reconnecting a connection that isn't a subscription says so" do
     model_fixture("primary")
 

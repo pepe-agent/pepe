@@ -116,8 +116,15 @@ defmodule Pepe.OAuth do
   @doc """
   Return a model whose OAuth access token is valid, refreshing it (and persisting
   the new token to the connection) when it's expired or about to expire. A model
-  without OAuth metadata is returned untouched; a refresh failure leaves the model
+  without OAuth metadata is returned untouched; a refresh failure leaves the token
   as-is (the request then fails and is reported gracefully).
+
+  When the provider **refuses** the renewal (the refresh token was revoked, the
+  subscription lapsed), the connection is stamped with `"refresh_failed_at"` so the
+  dashboard can say "sign in again" instead of leaving the operator to find out from a
+  failed conversation. Only a refusal of the credential itself counts (see
+  `refused?/1`): a network error, a 5xx or a rate limit is not stamped, the next call
+  may well succeed. Any successful renewal or sign-in clears the stamp.
   """
   def ensure_fresh(%Pepe.Config.Model{oauth: oauth} = model) when is_map(oauth) do
     if fresh?(oauth["expires_at"]) do
@@ -125,7 +132,7 @@ defmodule Pepe.OAuth do
     else
       case refresh(oauth) do
         {:ok, tokens} -> persist_refresh(model, oauth, tokens)
-        {:error, _reason} -> model
+        {:error, reason} -> note_refresh_failure(model, oauth, reason)
       end
     end
   end
@@ -137,6 +144,34 @@ defmodule Pepe.OAuth do
 
   # Unknown expiry -> assume valid (refresh would happen on a 401 instead).
   defp fresh?(_), do: true
+
+  # Stamped once, at the first refusal: the dashboard shows since when the sign-in has been
+  # dead, and a conversation that keeps retrying must not rewrite config.json on every call.
+  # The write is `Pepe.Config.stamp_refresh_failure/2`'s conditional one, never a `put_model/1`
+  # of this snapshot: a Reconnect that landed while this call was in flight must keep its tokens.
+  defp note_refresh_failure(model, oauth, reason) do
+    at = System.os_time(:second)
+
+    if refused?(reason) and Pepe.Config.stamp_refresh_failure(model, at) == :ok do
+      %{model | oauth: Map.put(oauth, "refresh_failed_at", at)}
+    else
+      model
+    end
+  end
+
+  # Did the provider refuse the refresh token itself? `invalid_grant` is the OAuth answer for
+  # a refresh token that is invalid, expired or revoked (RFC 6749, 5.2); the other errors that
+  # share its 400 (`invalid_request`, `unsupported_grant_type`, ...) are about the request, and
+  # signing in again would not fix them. A 401 or 403 is a provider saying the same thing
+  # without the standard body, unless it names one of those other errors: a 401 `invalid_client`
+  # is the client's own authentication failing, not the refresh token. Everything else (429,
+  # 408, 5xx, no answer) can pass on its own.
+  @not_about_the_token ~w(invalid_client unauthorized_client invalid_request unsupported_grant_type invalid_scope)
+
+  defp refused?({:refresh_http, 400, %{"error" => "invalid_grant"}}), do: true
+  defp refused?({:refresh_http, status, %{"error" => error}}) when status in [401, 403] and error in @not_about_the_token, do: false
+  defp refused?({:refresh_http, status, _body}) when status in [401, 403], do: true
+  defp refused?(_reason), do: false
 
   @doc """
   Exchange a refresh token for a fresh access token, against any OAuth map carrying
@@ -231,6 +266,7 @@ defmodule Pepe.OAuth do
       oauth
       |> Map.put("refresh", tokens.refresh || oauth["refresh"])
       |> Map.put("expires_at", tokens.expires_at)
+      |> Map.delete("refresh_failed_at")
 
     updated = %{model | api_key: tokens.access, oauth: new_oauth}
     Pepe.Config.put_model(updated)

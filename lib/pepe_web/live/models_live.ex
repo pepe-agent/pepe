@@ -120,6 +120,35 @@ defmodule PepeWeb.ModelsLive do
 
   defp num_str(n), do: n |> :erlang.float_to_binary([:compact, {:decimals, 4}])
 
+  # The provider refused to renew this subscription sign-in (see `Pepe.OAuth.ensure_fresh/1`):
+  # nothing short of signing in again brings the connection back.
+  defp sign_in_dead?(%{oauth: oauth}), do: is_integer(oauth["refresh_failed_at"])
+
+  # What a subscription connection's card says about its sign-in. The access token is short
+  # lived and renewed on the next message, so its expiry passing is not a problem by itself;
+  # the one state that needs the operator is a renewal the provider refused.
+  defp sign_in_line(%{oauth: oauth} = m) do
+    now = System.os_time(:second)
+
+    cond do
+      sign_in_dead?(m) ->
+        gettext("Sign in again (Reconnect): the provider refused to renew this sign-in on %{at}.",
+          at: utc_stamp(oauth["refresh_failed_at"])
+        )
+
+      is_integer(oauth["expires_at"]) and oauth["expires_at"] > now ->
+        gettext("Signed in. The current token is valid until %{at} and renews on its own after that.", at: utc_stamp(oauth["expires_at"]))
+
+      is_integer(oauth["expires_at"]) ->
+        gettext("Signed in. The token expired on %{at} and renews on its own with the next message.", at: utc_stamp(oauth["expires_at"]))
+
+      true ->
+        gettext("Signed in. The token renews on its own.")
+    end
+  end
+
+  defp utc_stamp(unix), do: unix |> DateTime.from_unix!() |> Calendar.strftime("%Y-%m-%d %H:%M UTC")
+
   # The price line under a model card: manual price, auto price from the book, or a
   # nudge to set one so the model can be billed.
   defp price_line(m, currency) do
@@ -326,6 +355,9 @@ defmodule PepeWeb.ModelsLive do
               <:item label={gettext("Model:")} mono>{m.model}</:item>
               <:item label={gettext("Base URL")} mono>{m.base_url}</:item>
               <:item label={gettext("Billing")}>{price_line(m, @currency)}</:item>
+              <:item :if={is_map(m.oauth)} label={gettext("Sign-in")}>
+                <span class={if sign_in_dead?(m), do: "text-red-400"}>{sign_in_line(m)}</span>
+              </:item>
             </.meta_list>
           </div>
           </div>
@@ -799,9 +831,12 @@ defmodule PepeWeb.ModelsLive do
   end
 
   # A result for a card that was deleted while its ping was in flight is dropped, not resurrected.
+  #
+  # The models are reloaded with it: testing a subscription connection renews its token first,
+  # which can change what the card's sign-in line has to say (renewed, or refused).
   def handle_info({:model_tested, name, result}, socket) do
     if Config.get_model(name) do
-      {:noreply, assign(socket, tests: Map.put(socket.assigns.tests, name, result))}
+      {:noreply, assign(socket, models: Config.models(), tests: Map.put(socket.assigns.tests, name, result))}
     else
       {:noreply, socket}
     end

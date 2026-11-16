@@ -43,6 +43,8 @@ El panel puede hacer todo esto también, en su pestaña Modelos, si prefieres un
 
 Allí, cada conexión tiene además un botón **Probar**. Envía un mensaje mínimo por la conexión y muestra en la propia tarjeta si funcionó, y cuánto tardó la respuesta, o por qué falló, con las palabras del propio proveedor (clave incorrecta, modelo que no existe, dirección que nadie atiende). Es la forma más rápida de comprobar una clave antes de poner un agente a usarla.
 
+Una conexión hecha con inicio de sesión de suscripción (ChatGPT, Claude) muestra además una línea **Inicio de sesión**. El token que entrega la suscripción dura poco, y Pepe lo renueva solo, así que la línea dice hasta cuándo vale el actual y que no tienes que hacer nada. El único caso que depende de ti es cuando el proveedor rechaza la renovación, porque la suscripción venció o el acceso fue revocado: la línea se pone roja y te pide iniciar sesión de nuevo con **Reconectar**.
+
 ### Renombrar una conexión
 
 ```bash

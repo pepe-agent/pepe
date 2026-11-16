@@ -5,6 +5,10 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+### Added
+
+- **A subscription connection now shows its sign-in status on the Models page.** A new "Sign-in" line says until when the current token is valid and that Pepe renews it on its own. When the provider refuses the renewal (the subscription lapsed or the access was revoked), the line turns red and asks you to sign in again with Reconnect, instead of leaving you to find out from a failed conversation.
+
 ## [0.22.0] - 2026-11-12
 
 ### Added
