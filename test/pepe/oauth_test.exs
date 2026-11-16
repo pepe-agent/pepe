@@ -383,6 +383,39 @@ defmodule Pepe.OAuthTest do
       assert Config.get_model("sub").api_key == "old-access"
     end
 
+    test "a renewal the provider refuses is stamped once, so the dashboard can ask for a new sign-in", %{token_url: url} do
+      answers(:fail)
+      Config.put_model(expiring_model(url, 10))
+
+      stamped = OAuth.ensure_fresh(Config.get_model("sub"))
+
+      assert_in_delta stamped.oauth["refresh_failed_at"], System.os_time(:second), 5
+      assert Config.get_model("sub").oauth["refresh_failed_at"] == stamped.oauth["refresh_failed_at"]
+
+      # A conversation that keeps retrying must not move the stamp: it says since when.
+      first = %{stamped | oauth: Map.put(stamped.oauth, "refresh_failed_at", 1)}
+      Config.put_model(first)
+      assert OAuth.ensure_fresh(Config.get_model("sub")).oauth["refresh_failed_at"] == 1
+    end
+
+    test "a renewal that could not reach the provider is not stamped" do
+      # Nothing listens on port 1: a network error, which the next call may well get past.
+      Config.put_model(expiring_model("http://localhost:1/token", 10))
+
+      assert OAuth.ensure_fresh(Config.get_model("sub")).api_key == "old-access"
+      refute Map.has_key?(Config.get_model("sub").oauth, "refresh_failed_at")
+    end
+
+    test "a successful renewal clears the stamp", %{token_url: url} do
+      model = expiring_model(url, 10)
+      Config.put_model(%{model | oauth: Map.put(model.oauth, "refresh_failed_at", 1)})
+
+      fresh = OAuth.ensure_fresh(Config.get_model("sub"))
+
+      assert fresh.api_key == "fresh-access"
+      refute Map.has_key?(Config.get_model("sub").oauth, "refresh_failed_at")
+    end
+
     test "a refresh grant that returns no new refresh token keeps the old one", %{token_url: url} do
       # Some providers rotate the refresh token, some don't. Dropping it when they don't
       # would silently make the connection unrefreshable from the next expiry on.

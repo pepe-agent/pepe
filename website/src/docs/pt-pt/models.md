@@ -43,6 +43,8 @@ O painel também faz tudo isto, no separador Modelos, caso prefiras um formulár
 
 Lá, cada ligação tem ainda um botão **Testar**. Envia uma mensagem mínima pela ligação e mostra no próprio cartão se funcionou, e quanto tempo demorou a resposta, ou porque falhou, pelas palavras do próprio fornecedor (chave errada, modelo que não existe, endereço a que ninguém responde). É a forma mais rápida de confirmar uma chave antes de pores um agente a usá-la.
 
+Uma ligação feita com início de sessão de subscrição (ChatGPT, Claude) mostra também uma linha **Início de sessão**. O token que a subscrição entrega dura pouco, e o Pepe renova-o sozinho, por isso a linha diz até quando o atual é válido e que não tens de fazer nada. O único caso que depende de ti é quando o fornecedor recusa a renovação, porque a subscrição expirou ou o acesso foi revogado: a linha fica vermelha e pede-te que inicies sessão outra vez em **Religar**.
+
 ### Renomear uma ligação
 
 ```bash

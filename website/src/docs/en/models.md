@@ -49,6 +49,8 @@ over the command line.
 
 Each connection there also has a **Test** button. It sends one tiny message through the connection and tells you right on the card whether it works, and how long the answer took, or why it failed, in the provider's own words (a wrong key, a model that does not exist, an address nobody answers). It is the quickest way to check a key before putting an agent on it.
 
+A connection signed in with a subscription (ChatGPT, Claude) also shows a **Sign-in** line. The token a subscription gives is short lived, and Pepe renews it on its own, so the line tells you until when the current one is valid and that there is nothing for you to do. The one case that needs you is when the provider refuses the renewal, because the subscription lapsed or the access was revoked: the line turns red and asks you to sign in again with **Reconnect**.
+
 ### Rename a connection
 
 ```bash

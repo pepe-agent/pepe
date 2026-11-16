@@ -116,8 +116,14 @@ defmodule Pepe.OAuth do
   @doc """
   Return a model whose OAuth access token is valid, refreshing it (and persisting
   the new token to the connection) when it's expired or about to expire. A model
-  without OAuth metadata is returned untouched; a refresh failure leaves the model
+  without OAuth metadata is returned untouched; a refresh failure leaves the token
   as-is (the request then fails and is reported gracefully).
+
+  When the provider **refuses** the renewal (a 4xx: the refresh token was revoked, the
+  subscription lapsed), the connection is stamped with `"refresh_failed_at"` so the
+  dashboard can say "sign in again" instead of leaving the operator to find out from a
+  failed conversation. A network error or a 5xx is not stamped: the next call may
+  well succeed. Any successful renewal or sign-in clears the stamp.
   """
   def ensure_fresh(%Pepe.Config.Model{oauth: oauth} = model) when is_map(oauth) do
     if fresh?(oauth["expires_at"]) do
@@ -125,7 +131,7 @@ defmodule Pepe.OAuth do
     else
       case refresh(oauth) do
         {:ok, tokens} -> persist_refresh(model, oauth, tokens)
-        {:error, _reason} -> model
+        {:error, reason} -> note_refresh_failure(model, oauth, reason)
       end
     end
   end
@@ -137,6 +143,20 @@ defmodule Pepe.OAuth do
 
   # Unknown expiry -> assume valid (refresh would happen on a 401 instead).
   defp fresh?(_), do: true
+
+  # Stamped once, at the first refusal: the dashboard shows since when the sign-in has been
+  # dead, and a conversation that keeps retrying must not rewrite config.json on every call.
+  defp note_refresh_failure(model, oauth, {:refresh_http, status, _body}) when status in 400..499 do
+    if is_integer(oauth["refresh_failed_at"]) do
+      model
+    else
+      updated = %{model | oauth: Map.put(oauth, "refresh_failed_at", System.os_time(:second))}
+      Pepe.Config.put_model(updated)
+      updated
+    end
+  end
+
+  defp note_refresh_failure(model, _oauth, _reason), do: model
 
   @doc """
   Exchange a refresh token for a fresh access token, against any OAuth map carrying
@@ -231,6 +251,7 @@ defmodule Pepe.OAuth do
       oauth
       |> Map.put("refresh", tokens.refresh || oauth["refresh"])
       |> Map.put("expires_at", tokens.expires_at)
+      |> Map.delete("refresh_failed_at")
 
     updated = %{model | api_key: tokens.access, oauth: new_oauth}
     Pepe.Config.put_model(updated)
